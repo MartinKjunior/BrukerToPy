@@ -166,7 +166,7 @@ class BrPyLoader:
             else:
                 raise FileNotFoundError('Failed to find path to data.')
             return (output[::2], output[1::2])
-    
+    #To do: make this work with .nii files as well
     def get_all_recos(self, scan_id, as_numpy = True):
         """
         Returns a dictionary containing all records under a given scan id.
@@ -211,7 +211,7 @@ class BrPyLoader:
                             scan_id, reco_id
                             )
             return output
-    
+    #To do: make this work with .nii files as well
     def get_all_scans(self, as_numpy = True):
         """
         Returns a dictionary containing all records under all available scan 
@@ -297,9 +297,10 @@ class DataObject:
     Attributes:
         
     
+    To do: make pull_exam_data return either a dataclass or a named tuple for
+    convenience when handling the data.
     '''
-    #To do: make pull_exam_data return either a dataclass or a named tuple for
-    #convenience when handling the data.
+    
     def __init__(self, path = ""):
         if not os.path.isdir(path):
             raise ValueError(f"Invalid path input: {path}")
@@ -696,7 +697,8 @@ class DataObject:
     
     def save_processed_data(self, newdata, dirname, filename, affine, 
                             header=None, msg=True, processing_id=None,
-                            subfolders=None, overwrite=True, ext='.nii.gz'):
+                            subfolders=None, overwrite=True, ext='.nii.gz',
+                            prepend=True):
         '''
         Saves data of the exam currently being processed (from 
         self.processing_id) to a nifti file in folder 'dirname'.
@@ -705,7 +707,7 @@ class DataObject:
         ----------
         newdata : np.ndarray
         dirname : str
-            Shortcut of the folder to store the new data.
+            Full name or shortcut of the folder to store the new data.
             The shortcut is made of all uppercase letters in the folder name.
         filename : str
             The file will be named {self.processing_id}_{filename}.nii.gz
@@ -719,6 +721,10 @@ class DataObject:
             Choose a path to a subfolder to save the data to.
         overwrite : bool, optional
             Whether or not to overwrite existing files.
+        ext : str, optional
+            File extension of the saved file (compatible with nib.save()).
+        prepend : bool, optional
+            Whether to prepend the exam_id at the front of the filename.
 
         Raises
         ------
@@ -732,23 +738,39 @@ class DataObject:
         '''
         if self.processing_id is None and processing_id is None:
             raise ValueError('No exam being processed at the moment.')
+            
         if subfolders is not None:
             if not isinstance(subfolders, list):
                 raise ValueError('subfolders must be a list or None')
             elif not all(isinstance(x, str) for x in subfolders):
                 raise ValueError('subfolders must contain only strings')
+                
         if processing_id is None:
             processing_id = self.processing_id
+            
         if msg:
             print(f'Saving exam {processing_id}.')
-        exampath = next((p for p in self.savedirs if str(processing_id) in p), None)
-        dirpath = os.path.join(exampath, self.processed_dirs[dirname])
+            
+        if self.processing_path is None:
+            exampath = next((p for p in self.savedirs if str(processing_id) in p), None)
+        else:
+            exampath = self.processing_path
+            
+        if dirname.isupper():
+            dirpath = self.processed_dirs[dirname]
+        else:
+            dirpath = dirname
+            
+        dirpath = os.path.join(exampath, dirpath)
         if subfolders is not None:
             dirpath = os.path.join(dirpath, *subfolders)
         if not os.path.isdir(dirpath):
             raise FileNotFoundError(f'Could not find {dirpath} when saving '
                                     f'exam {processing_id}.')
-        filepath = os.path.join(dirpath, f'{processing_id}_{filename}{ext}')
+        if prepend:
+            filepath = os.path.join(dirpath, f'{processing_id}_{filename}{ext}')
+        else:
+            filepath = os.path.join(dirpath, f'{filename}{ext}')
         if not overwrite and os.path.isfile(filepath):
             return
         nifti = nib.Nifti1Image(newdata, affine, header=header)
