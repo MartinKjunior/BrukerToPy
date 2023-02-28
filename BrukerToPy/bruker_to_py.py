@@ -297,10 +297,9 @@ class DataObject:
     Attributes:
         
     
-    To do: make pull_exam_data return either a dataclass or a named tuple for
-    convenience when handling the data.
     '''
-    
+    #To do: make pull_exam_data return either a dataclass or a named tuple for
+    #convenience when handling the data.
     def __init__(self, path = ""):
         if not os.path.isdir(path):
             raise ValueError(f"Invalid path input: {path}")
