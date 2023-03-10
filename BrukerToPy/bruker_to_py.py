@@ -14,6 +14,7 @@ import pprint
 import numpy as np
 import nibabel as nib
 import pandas as pd
+import SimpleITK as sitk
 from pathlib import Path
 from glob import glob
 
@@ -126,7 +127,9 @@ class BrPyLoader:
         Parameters
         ----------
         scan_id : int
+        
         reco_id : int
+        
         as_numpy : bool, optional
             Return a tuple containing a numpy array. The default is True.
 
@@ -174,6 +177,7 @@ class BrPyLoader:
         Parameters
         ----------
         scan_id : int
+        
         as_numpy : bool, optional
             The dictionary get populated with either numpy arrays or nifti 
             images. The default is True which returns a dictionary of arrays.
@@ -263,6 +267,7 @@ class BrPyLoader:
         Parameters
         ----------
         scan_id : int
+        
         reco_id : int
 
         Returns
@@ -400,6 +405,13 @@ class DataObject:
     def _get_rat_overview(self):
         '''
         Load the Rat_Overview file and remove the entries without data.
+        Rat_Overview should be an excel file containing information about the 
+        rats and which study_ids contain various scans. For example, my file 
+        has the following columns: 
+            ['Date', 'ID', 'Ear tag', 'Animal kind', 'Animal type', 'Study ID',
+             'Date of birth', 'Age (days)', 'Anatomical highres 2D',
+             'Anatomical highres CSF 3D', 'Phase contrast 200ms',
+             'Phase contrast 125ms', 'b0 map']
 
         Returns
         -------
@@ -536,75 +548,74 @@ class DataObject:
         None.
 
         '''
+        #To do: add support for loading sitk.Image, however this could lead to
+        # errors if the image dimensions are too large (>4 I think?)
         if not isinstance(as_numpy, bool):
             raise ValueError('as_numpy must be boolean.')
         if not isinstance(clear, bool):
             raise ValueError('clear must be boolean.')
         exam_id = str(exam_id)
-        
         if exam_id.isdecimal():
-            if self.avail_exams:
-                if exam_id in self.avail_exams:
-                    ex = self.avail_exams[exam_id][0]
-                    #Gets all recos under all scans for an exam. Currently 
-                    #doesn't include the acqp, method etc. files.
-                    if scan_id is None and reco_id is None:
-                        if clear:
-                            self.exam_data = []
-                        output = {exam_id : ex.get_all_scans(as_numpy)}
-                        if not to_self:
-                            return output
-                        else:
-                            self.exam_data = output
-                    #Gets all recos under given scan.
-                    elif isinstance(scan_id, self.int) and reco_id is None:
-                        if clear:
-                            self.scan_data = []
-                        output = {
-                            "exam_id" : exam_id,
-                            "scan_id" : scan_id,
-                            "acqp"    : ex.get_acqp(scan_id),
-                            "method"  : ex.get_method(scan_id),
-                            "recos"   : ex.get_all_recos(scan_id)
-                            }
-                        if not to_self:
-                            return output
-                        else:
-                            self.scan_data.append(output)
-                    #Gets a particular reco under a particular scan.
-                    elif isinstance(scan_id, self.int) and isinstance(reco_id, self.int):
-                        if clear:
-                            self.reco_data = []
-                        if as_numpy:
-                            names = ('data', 'affine', 'header', 'visu_pars')
-                        else:
-                            names = ('data', 'visu_pars')
-                        output = {
-                            "exam_id" : exam_id,
-                            "scan_id" : scan_id,
-                            "acqp"    : ex.get_acqp(scan_id),
-                            "method"  : ex.get_method(scan_id),
-                            "recos"   : dict(
-                                zip(
-                                    names, 
-                                    ex.get_dataobj(scan_id, reco_id, as_numpy) 
-                                    + (ex.get_visu_pars(scan_id, reco_id), )
-                                    )
-                                )
-                            }
-                        if not to_self:
-                            return output
-                        else:
-                            self.reco_data.append(output)
-                    else:
-                        raise ValueError(f'Unsupported input: {exam_id=}, '
-                                         f'{scan_id=}, {reco_id=}.')
-                else:
-                    raise ValueError(f'Exam id {exam_id} was not found.')
-            else:
+            if not self.avail_exams:
                 raise AttributeError('No exams had been loaded. Please use '
                                      'load_exams() first if id is int.')
-                
+            if exam_id not in self.avail_exams:
+                raise ValueError(f'Exam id {exam_id} was not found.')
+            ex = self.avail_exams[exam_id][0]
+            #Gets all recos under all scans for an exam. Currently 
+            #doesn't include the acqp, method etc. files.
+            if scan_id is None and reco_id is None:
+                if clear:
+                    self.exam_data = []
+                output = {exam_id : ex.get_all_scans(as_numpy)}
+                if not to_self:
+                    return output
+                else:
+                    self.exam_data = output
+            #Gets all recos under given scan.
+            elif isinstance(scan_id, self.int) and reco_id is None:
+                if clear:
+                    self.scan_data = []
+                output = {
+                    "exam_id" : exam_id,
+                    "scan_id" : scan_id,
+                    "acqp"    : ex.get_acqp(scan_id),
+                    "method"  : ex.get_method(scan_id),
+                    "recos"   : ex.get_all_recos(scan_id)
+                    }
+                if not to_self:
+                    return output
+                else:
+                    self.scan_data.append(output)
+            #Gets a particular reco under a particular scan.
+            elif isinstance(scan_id, self.int) and isinstance(reco_id, self.int):
+                if clear:
+                    self.reco_data = []
+                if as_numpy:
+                    names = ('data', 'affine', 'header', 'visu_pars')
+                else:
+                    names = ('data', 'visu_pars')
+                output = {
+                    "exam_id" : exam_id,
+                    "scan_id" : scan_id,
+                    "acqp"    : ex.get_acqp(scan_id),
+                    "method"  : ex.get_method(scan_id),
+                    "recos"   : dict(
+                        zip(
+                            names, 
+                            ex.get_dataobj(scan_id, reco_id, as_numpy) 
+                            + (ex.get_visu_pars(scan_id, reco_id), )
+                            )
+                        )
+                    }
+                if not to_self:
+                    return output
+                else:
+                    self.reco_data.append(output)
+            else:
+                raise ValueError(f'Unsupported input: {exam_id=}, '
+                                 f'{scan_id=}, {reco_id=}.')
+        #not overly useful, might remove
         else:
             if self.exam:
                 if clear:
@@ -622,7 +633,7 @@ class DataObject:
         return vars(self)
     
     def pull_processed_data(self, exam_id, dir_label, to_dict = True, 
-                            as_numpy = True, substring = ''):
+                            as_numpy = True, as_image = False, substring = ''):
         '''
         A method for fetching saved processed data. Returns each dataset in
         the order it appears in file explorer.
@@ -634,13 +645,18 @@ class DataObject:
         dir_label : str/list[str]
             Label of the folder containing the processed data. Few options:
             1. Use just the shortcut of the folder name (all capital letters). 
-               Full list found in self.processed_dirs.
-            2. Use full folder name.
-            3. Use a list of full folder names.
+                Full list found in self.processed_dirs.
+                e.g. 'RawData' -> 'RD'
+            2. Use full folder name or path to a subfolder.
+                e.g. 'RawData' or 'RawData/Patient1/Scan2'
+            3. Use a list of full folder names to access subfolders.
+                e.g. ['RawData', 'Patient1', 'Scan2']
         to_dict : bool, optional
             Returns the path as key if True. The default is True.
         as_numpy : bool, optional
             Returns a numpy array otherwise Nifti1Image. The default is True.
+        as_image : bool, optional
+            Returns a sitk.Image object, overrides as_numpy. The default is True.
         substring : str, optional
             A substring in filepath to be found. The default is ''.
 
@@ -651,7 +667,9 @@ class DataObject:
         FileNotFoundError
             The folder with processed data is empty.
         ImageFileError
-            glob() likely returned non-image file or folder, use substring=
+            glob() likely returned non-image file or folder, use substring=.
+            *This should no longer be an issue.
+        
         Returns
         -------
         list[np.ndarray/Nifti1Image] / dict[str : np.ndarray/Nifti1Image]
@@ -678,11 +696,17 @@ class DataObject:
             raise ValueError('dir_label must be either string or list of strings.')
         #when recursive=False (default) using /** should be the same as /*
         data_paths = glob(f'{os.path.join(exam_path, dirpath)}/*{substring}*')
+        data_paths = [path for path in data_paths if os.path.isfile(path)]
         if not data_paths:
             raise FileNotFoundError('Failed to find path to data.')
-        if as_numpy:
+        #return a numpy array
+        if as_numpy and not as_image:
             output = [nib.load(data_path).get_fdata() 
                       for data_path in data_paths]
+        #return a SimpleITK Image object
+        elif as_image:
+            output = [sitk.ReadImage(data_path) for data_path in data_paths]
+        #return nibabel Nifti1Image object
         else:
             output = [nib.load(data_path) for data_path in data_paths]
         if to_dict:
@@ -706,17 +730,20 @@ class DataObject:
         Parameters
         ----------
         newdata : np.ndarray
+        
         dirname : str
             Full name or shortcut of the folder to store the new data.
             The shortcut is made of all uppercase letters in the folder name.
         filename : str
             The file will be named {self.processing_id}_{filename}.nii.gz
         affine : np.ndarray
+        
         header : nibabel.nifti1.Nifti1Header or None, optional
             The default is None.
         msg : bool, optional
             Lets you know which exam id is being used. The default is True.
         processing_id : int, optional
+        
         subfolders : list[string], optional
             Choose a path to a subfolder to save the data to.
         overwrite : bool, optional
@@ -752,6 +779,7 @@ class DataObject:
             print(f'Saving exam {processing_id}.')
             
         if self.processing_path is None:
+            #look for path and stop searching once you find it
             exampath = next((p for p in self.savedirs if str(processing_id) in p), None)
         else:
             exampath = self.processing_path
@@ -776,20 +804,20 @@ class DataObject:
         nifti = nib.Nifti1Image(newdata, affine, header=header)
         nib.save(nifti, filepath)
     
-    def gen_processed_data(self, dir_short, substring):
+    def gen_processed_data(self, dirname, substring='', as_image = False):
         '''
         Yields processed data specified by dir_short and substring.
 
         Parameters
         ----------
         dir_short : str
-            Shortcut of a directory made of capital letters in its name.
-        substring : str
-            Substring that identifies all files we want to return.
+            Directory name or its shortcut made of only capital letters.
+        substring : str, optional
+            Substring that identifies all files we want to return. Default ''.
 
         Yields
         ------
-        nifti : nib.Nifti1Image
+        nifti : nibabel.Nifti1Image or SimpleITK.Image
         arr : numpy.ndarray
         name : str
             File name of the nifti file.
@@ -797,21 +825,26 @@ class DataObject:
 
         '''
         for exam_id in self.avail_exams:
-            #dictionary with images
-            imgdict = self.pull_processed_data(
-                exam_id, 
-                dir_short,
-                to_dict = True,
-                as_numpy = False,
-                substring = substring
-                )
-            if not imgdict:
+            try:
+                #dictionary with images
+                imgdict = self.pull_processed_data(
+                    exam_id, 
+                    dirname,
+                    to_dict = True,
+                    as_numpy = False,
+                    as_image = as_image,
+                    substring = substring
+                    )
+            except FileNotFoundError:
                 print(f'Exam {exam_id} does not contain the processed data '
-                      f'using {dir_short=} and {substring=}')
+                      f'using {dirname=} and {substring=}')
                 continue
             #for path, nifti in mag_nifti:
             for name, nifti in imgdict.items():
-                arr = nifti.get_fdata()
+                if as_image:
+                    arr = sitk.GetArrayFromImage(nifti)
+                else:
+                    arr = nifti.get_fdata()
                 yield nifti, arr, name, exam_id
     
     def save_bval_bvec(self):
@@ -994,11 +1027,3 @@ class DataObject:
 #     new_nifti = nib.Nifti1Image(arr, nifti.affine, header=header)
 #     nib.save(new_nifti, path)
 #     print(f'Data reshaped and saved in {path}.')
-
-if __name__ == "__main__": 
-    
-    test = load("C:/Users/mbcxamk2/OneDrive - The University of Manchester/Uni"
-                "/PhD project/Rat_studies/Rat_MRI_data/"
-                "20220907_145115_220530_1_1_loaded")
-    test_reco = test.get_all_recos(1)
-    
