@@ -425,7 +425,7 @@ class DataObject:
                 os.path.join(os.path.dirname(self.path), filename)
                 )
         except Exception as e:
-            print('Warning: Rat_Overview file could not be loaded!')
+            print(f'Warning: {filename} file could not be loaded!')
             print(e)
             return None
     
