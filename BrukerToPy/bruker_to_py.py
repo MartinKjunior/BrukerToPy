@@ -306,7 +306,7 @@ class DataObject:
     convenience when handling the data.
     '''
     
-    def __init__(self, path = ""):
+    def __init__(self, path = "", animal_overview = "Rat_Overview.xlsx"):
         if not os.path.isdir(path):
             raise ValueError(f"Invalid path input: {path}")
 
@@ -326,7 +326,7 @@ class DataObject:
         self.avail_exam_ids  = self._get_exam_ids()
         self.savedirs        = self._prepare_savedir_paths()
         self.processed_dirs  = self._find_processed_dirs()
-        self.rat_overview    = self._get_rat_overview()
+        self.rat_overview    = self._get_animal_overview(animal_overview)
         #isinstance(n, self.int) will accept any integer now
         self.int = (int, np.integer)
         
@@ -404,7 +404,7 @@ class DataObject:
                              'uppercase letters in their names.')
         return dict(zip(shortnames, basenames))
     
-    def _get_rat_overview(self):
+    def _get_animal_overview(self, filename):
         '''
         Load the Rat_Overview file and remove the entries without data.
         Rat_Overview should be an excel file containing information about the 
@@ -422,7 +422,7 @@ class DataObject:
         '''
         try:
             return pd.read_excel(
-                os.path.join(os.path.dirname(self.path), 'Rat_Overview.xlsx')
+                os.path.join(os.path.dirname(self.path), filename)
                 )
         except Exception as e:
             print('Warning: Rat_Overview file could not be loaded!')
