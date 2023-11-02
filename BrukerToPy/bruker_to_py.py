@@ -326,7 +326,7 @@ class DataObject:
         self.avail_exam_ids  = self._get_exam_ids()
         self.savedirs        = self._prepare_savedir_paths()
         self.processed_dirs  = self._find_processed_dirs()
-        self.rat_overview    = self._get_animal_overview(animal_overview)
+        self.animal_overview    = self._get_animal_overview(animal_overview)
         #isinstance(n, self.int) will accept any integer now
         self.int = (int, np.integer)
         
