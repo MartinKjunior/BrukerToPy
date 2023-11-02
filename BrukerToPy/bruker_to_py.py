@@ -37,7 +37,7 @@ def load(path, msg = True):
     Returns
     -------
     BrPyLoader
-        Object for retreiving data from the '..._loaded' subfolders. 
+        Object for retrieving data from the '..._loaded' subfolders. 
         Similar behaviour to the pvdset object from BrkRaw.
 
     '''
@@ -349,8 +349,10 @@ class DataObject:
 
         '''
         all_p = glob(f"{self.path}/*")
+        #Sort in case glob returns them in reverse order
+        all_p = sorted(all_p, key = lambda x: int(os.path.basename(x).split('_')[2]))
         p_loaded = [x for x in all_p if x.endswith("_loaded")]
-        p_raw = [x for x in all_p if x not in p_loaded]
+        p_raw = [x for x in all_p if x not in p_loaded and x.endswith("_1_1")]
         
         return (all_p, p_loaded, p_raw)
     
@@ -421,9 +423,10 @@ class DataObject:
         try:
             return pd.read_excel(
                 os.path.join(os.path.dirname(self.path), 'Rat_Overview.xlsx')
-                ).drop('Notes', axis=1).dropna()
-        except Exception:
+                )
+        except Exception as e:
             print('Warning: Rat_Overview file could not be loaded!')
+            print(e)
             return None
     
     def prepare_savedirs(self, *newdirs):
@@ -516,7 +519,7 @@ class DataObject:
                         a particular scan. Contains metadata too.
             + reco_id - creates self.reco_data containing a dict with one reco.
                         Contains metadata too.
-            
+            _data(
             exam_id == 'exam' - loads scans from exam loaded with load_exam().
 
         Parameters
@@ -561,6 +564,7 @@ class DataObject:
                                      'load_exams() first if id is int.')
             if exam_id not in self.avail_exams:
                 raise ValueError(f'Exam id {exam_id} was not found.')
+            #Instance of BrPyLoader
             ex = self.avail_exams[exam_id][0]
             #Gets all recos under all scans for an exam. Currently 
             #doesn't include the acqp, method etc. files.
@@ -595,6 +599,7 @@ class DataObject:
                     names = ('data', 'affine', 'header', 'visu_pars')
                 else:
                     names = ('data', 'visu_pars')
+                #Bug: things get messed up if there are multiple images in the same reco folder
                 output = {
                     "exam_id" : exam_id,
                     "scan_id" : scan_id,
@@ -777,10 +782,11 @@ class DataObject:
             
         if msg:
             print(f'Saving exam {processing_id}.')
-            
-        if self.processing_path is None:
+        
+        if self.processing_path is None or str(processing_id) not in self.processing_path:
             #look for path and stop searching once you find it
             exampath = next((p for p in self.savedirs if str(processing_id) in p), None)
+            self.processing_path = exampath
         else:
             exampath = self.processing_path
             
