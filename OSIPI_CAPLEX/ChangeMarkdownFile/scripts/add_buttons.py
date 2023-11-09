@@ -83,7 +83,7 @@ def save_markdown_file(path, lines, safe):
                         'Do you wish to continue? (y/n): ')
         if decision.lower() != 'y':
             return
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.writelines(lines)
 
 def test(inputpath, testpath, safe):
