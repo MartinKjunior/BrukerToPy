@@ -1,0 +1,5 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" G.DE1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> "," <a id=""Discretization method""></a> Discretization method ", -- , -- ," Method to transfer continuous models, functions and equations into discrete counterparts. Select from [Discretization methods](#Discretization methods).", -- 
+" G.DE1.002 <button class=""md-button md-button--hyperlink"">COPY LINK</button> "," <a id=""Regularization method""></a> Regularization method ", -- , -- , Method to control an excessively fluctuating function such that the coefficients do not take extreme values. This is done by adding an additional penalty term in the cost function. Select a regularized cost function from [Cost functions](#Cost functions)., -- 
+ G.DE1.999 ," <a id=""not listed DE1""></a> Method not listed ", -- , -- ,"This is a custom free-text item, which can be used if a method of interest is not listed. Please state a literature reference and request the item to be added to the lexicon for future usage.  ", -- 

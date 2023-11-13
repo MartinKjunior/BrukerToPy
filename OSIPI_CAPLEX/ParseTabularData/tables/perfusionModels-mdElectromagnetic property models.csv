@@ -1,0 +1,4 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" M.SM7.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Linear susceptibility signal model , -- , -- ," This forward model is given by the following equation: <br/> $S=k\cdot \chi$, </br> with <br/> [k (Q.GE1.009)](quantities.md#const){:target=""_blank""},<br/> [$\chi$ (Q.EL1.011)](quantities.md#Chi){:target=""_blank""}, <br/> [S (Q.MS1.001)](quantities.md#S){:target=""_blank""}. ",  -- 
+ M.SM7.999 ," <a id=""not listed SM7""></a> Model not listed ", -- , -- ," This is a custom free-text item, which can be used if a model of interest is not listed. Please state a literature reference and request the item to be added to the lexicon for future usage. ", -- 

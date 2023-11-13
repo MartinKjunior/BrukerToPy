@@ -1,0 +1,3 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" P.BL1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Estimate Baseline , -- , EstimateBaseline , This process returns the value of the baseline of a data set according to a specified baseline estimation method.  <br /> **Input:** <br /> Baseline estimation method (select from [Baseline estimation methods](#Baseline estimation methods)) <br /> **Output**: <br /> [Baseline (Q.BL1.001)](quantities.md#f_BL) , -- 

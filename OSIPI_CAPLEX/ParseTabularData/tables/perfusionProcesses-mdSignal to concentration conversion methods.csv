@@ -1,0 +1,3 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" P.SC1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Convert signal to concentration , -- , ConvertSToC , In this process the MR signal is converted to the indicator concentration according to a specified concentration conversion method. <br /> **Input:** <br /> Signal to concentration conversion method (select from [signal to concentration conversion methods](#Signal to concentration conversion methods)). <br />  **Output**: <br /> [Indicator concentration (Q.IC1.001)](quantities.md#C) <br />  , -- 

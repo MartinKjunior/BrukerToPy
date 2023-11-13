@@ -1,0 +1,3 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" P.SC1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Estimate signal scaling factor , -- , Estimate *S<sub>0</sub>* , In this process the signal scaling factor is determined according to a specified *S<sub>0</sub>* -estimation method.  <br /> **Input:** <br /> Signal scaling factor estimation method ( select from [signal scaling factor estimation methods](#Signal scaling factor estimation methods)) <br /> **Output**: <br /> [*S<sub>0</sub>* (Q.MS1.010)](quantities.md#S_0) , -- 

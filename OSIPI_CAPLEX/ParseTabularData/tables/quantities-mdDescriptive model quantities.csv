@@ -1,0 +1,4 @@
+Code,OSIPI name,Alternative names,Notation,Description,OSIPI units,Reference
+ -- , -- , -- , -- , -- , -- , -- 
+" Q.BL1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> "," <a id=""f_BL""></a> Baseline value  ", -- , f<sub>BL</sub> , The value of a series of data of constant values in the beginning of a data set before the behavior of the data set changes. The baseline value is obtained by applying the baseline estimation process. , variable , -- 
+ Q.BL.999 ," <a id=""not listed BL1""></a> Quantity not listed ", -- , -- ," This is a custom free-text item, which can be used if a quantity of interest is not listed. Please state a literature reference and request the item to be added to the lexicon for future usage. ", [variable] , -- 

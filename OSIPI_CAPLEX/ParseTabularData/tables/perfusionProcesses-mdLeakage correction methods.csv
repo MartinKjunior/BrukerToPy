@@ -1,0 +1,3 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" P.LC1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Leakage correction , -- , LC , This method is used to correct for the leakage of an indicator into the tissue which is not assumed to leave the vasculature. <br />  **Input**: <br /> Leakage correction method (select from [leakage correction methods](#Leakage correction methods)) <br />  **Output**: <br /> [R<sub>2</sub><sup>*</sup> (Q.EL1.007)](quantities.md#R2Star) , -- 

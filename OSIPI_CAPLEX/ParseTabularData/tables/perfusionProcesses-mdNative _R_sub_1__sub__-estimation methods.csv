@@ -1,0 +1,3 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" P.NR1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Estimate native  *R<sub>1</sub>*  , -- , Estimate *R<sub>10</sub>* , This process returns the native *R<sub>1</sub>* relaxation rate *R<sub>10</sub>* derived using a given native *R<sub>1</sub>*  estimation method. <br /> **Input**: <br /> Native *R<sub>1</sub>* estimation method (select from [Native *R<sub>1</sub>*-estimation methods](#Native R1 estimation methods)) <br /> **Output:** <br /> [*R<sub>10</sub>* (Q.EL1.002)](quantities.md#R10), -- 

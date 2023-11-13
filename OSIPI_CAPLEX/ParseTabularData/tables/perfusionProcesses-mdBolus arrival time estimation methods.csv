@@ -1,0 +1,3 @@
+Code,OSIPI name,Alternative names,Notation,Description,Reference
+ -- , -- , -- , -- , -- , -- 
+" P.BA1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> ", Estimate Bolus Arrival Time , -- , EstimateBAT , This process returns the bolus arrival time (BAT) of a data set according to a specified bolus arrival time estimation method. <br /> **Input:** <br /> Bolus arrival time estimation method (select from [BAT estimation methods](#Bolus arrival time estimation methods)) <br /> **Output**: <br />  [Bolus arrival time (Q.BA1.001)](quantities.md#BAT) , -- 

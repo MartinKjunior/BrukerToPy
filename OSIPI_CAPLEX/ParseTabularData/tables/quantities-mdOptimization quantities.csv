@@ -1,0 +1,5 @@
+Code,OSIPI name,Alternative names,Notation,Description,OSIPI units,Reference
+ -- , -- , -- , -- , -- , -- , -- 
+" Q.AI1.001 <button class=""md-button md-button--hyperlink"">COPY LINK</button> "," <a id=""AI_SMP""></a> Static model parameters ", -- ,SMP , A vector of the known quantities of a forward model. Select from section Q. , [variable units] , -- 
+" Q.AI1.002 <button class=""md-button md-button--hyperlink"">COPY LINK</button> "," <a id=""AI_MP""></a> Model parameters ", -- , MP , A vector of the quantities to be determined by the analytical inversion of a forward model. Select from section Q. , [variable units] ,-- 
+ Q.AI1.999 ," <a id=""""></a> Quantity not listed ", -- , -- ," This is a custom free-text item, which can be used if a quantity of interest is not listed. Please state a literature reference and request the item to be added to the lexicon for future usage. ", [variable] , -- 
