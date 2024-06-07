@@ -2,10 +2,11 @@
 """
 Created on Fri Sep  9 15:02:46 2022
 
-@author: mbcxamk2
+@author: Martin Kozár (University of Manchester)
+@contact: martin.kozar@manchester.ac.uk
 
 This is a script meant for loading Bruker data into Python. The Bruker data 
-should be in the format resulting from using load_bruker() which utilises
+should be in the format resulting from using load_bruker.py which utilises
 BrkRaw (pip install bruker) for loading and saving the data.
 """
 
@@ -14,7 +15,8 @@ import pprint
 import numpy as np
 import nibabel as nib
 import pandas as pd
-import SimpleITK as sitk
+#import SimpleITK as sitk
+sitk = None
 from pathlib import Path
 from glob import glob
 
@@ -169,7 +171,7 @@ class BrPyLoader:
             else:
                 raise FileNotFoundError('Failed to find path to data.')
             return (output[::2], output[1::2])
-    #To do: make this work with .nii files as well
+
     def get_all_recos(self, scan_id, as_numpy = True):
         """
         Returns a dictionary containing all records under a given scan id.
@@ -194,7 +196,7 @@ class BrPyLoader:
                 path = f"{self.path}/{scan_id}/pdata/{reco_id}"
                 flag = True
                 for _path in glob(f"{path}/*"):
-                    if _path.endswith(".nii.gz"):
+                    if _path.endswith((".nii.gz", ".nii")):
                         reco_id2 = os.path.basename(_path)[7:-7]
                         if reco_id2.isdecimal():
                             reco_id2 = int(reco_id2)
@@ -215,7 +217,7 @@ class BrPyLoader:
                             scan_id, reco_id
                             )
             return output
-    #To do: make this work with .nii files as well
+
     def get_all_scans(self, as_numpy = True):
         """
         Returns a dictionary containing all records under all available scan 
@@ -249,7 +251,7 @@ class BrPyLoader:
                           "contains more than one image. The reco_id key type "
                           "will be changed to str.")
                     for _path in glob(f"{os.path.dirname(path)}/*"):
-                        if _path.endswith(".nii.gz"):
+                        if _path.endswith((".nii.gz", ".nii")):
                             key = os.path.basename(_path)[:-7].split("_")[1]
                             if as_numpy:
                                 output[scan_id][key] = nib.load(
@@ -297,16 +299,27 @@ class BrPyLoader:
 
 class DataObject:
     '''
-    Class for handling processed data.
+    Class for handling raw Bruker and processed data.
     
     Attributes:
-        
+        path - string containing path to the Bruker data folder
+        avail_exams - dictionary of the form {exam_id: [BrPyLoader, {scan_id:[reco_id,...]}]}
+        paths - list of all Bruker folders within path
+        paths_loaded - list of Bruker folders loaded into niftis
+        paths_raw - list of raw Bruker folders
+        avail_exam_ids - list of {exam id}s from the Bruker folder names
+        rat_overview - dataframe containing information about the rats and their data ids
     
-    To do: make pull_exam_data return either a dataclass or a named tuple for
-    convenience when handling the data.
+    Methods:
+        pull_exam_data - fetches raw data from a specified exam
+        pull_processed_data - fetches data from the processed data folder
+        save_processed_data - saves data to the processed data folder
+        prepare_savedirs - creates new directories for saving data in the processed data folder
+        save_bval_bves - saves bval and bvec files (for dwi data)
+        gen_processed_metadata - convenience function for accessing the method, acqp and visu_pars
     '''
     
-    def __init__(self, path = "", animal_overview = "Rat_Overview.xlsx"):
+    def __init__(self, path = ""):
         if not os.path.isdir(path):
             raise ValueError(f"Invalid path input: {path}")
 
@@ -319,6 +332,7 @@ class DataObject:
         self.reco_data       = []
         self.processing_id   = None
         self.processing_path = None
+        self.last_dir_path   = None
         
         (self.paths, 
          self.paths_loaded, 
@@ -326,7 +340,7 @@ class DataObject:
         self.avail_exam_ids  = self._get_exam_ids()
         self.savedirs        = self._prepare_savedir_paths()
         self.processed_dirs  = self._find_processed_dirs()
-        self.animal_overview = self._get_animal_overview(animal_overview)
+        self.rat_overview    = self._get_rat_overview()
         #isinstance(n, self.int) will accept any integer now
         self.int = (int, np.integer)
         
@@ -404,7 +418,7 @@ class DataObject:
                              'uppercase letters in their names.')
         return dict(zip(shortnames, basenames))
     
-    def _get_animal_overview(self, filename):
+    def _get_rat_overview(self) -> pd.DataFrame:
         '''
         Load the Rat_Overview file and remove the entries without data.
         Rat_Overview should be an excel file containing information about the 
@@ -420,12 +434,11 @@ class DataObject:
         pd.DataFrame
 
         '''
+        overview_path = os.path.join(os.path.dirname(self.path), 'Rat_Overview.xlsx')
         try:
-            return pd.read_excel(
-                os.path.join(os.path.dirname(self.path), filename)
-                )
+            return pd.read_excel(overview_path)
         except Exception as e:
-            print(f'Warning: {filename} file could not be loaded!')
+            print(f'Warning: Rat_Overview file could not be loaded from {overview_path}.')
             print(e)
             return None
     
@@ -564,6 +577,7 @@ class DataObject:
                                      'load_exams() first if id is int.')
             if exam_id not in self.avail_exams:
                 raise ValueError(f'Exam id {exam_id} was not found.')
+            self.current_exam_id = exam_id
             #Instance of BrPyLoader
             ex = self.avail_exams[exam_id][0]
             #Gets all recos under all scans for an exam. Currently 
@@ -657,7 +671,7 @@ class DataObject:
             3. Use a list of full folder names to access subfolders.
                 e.g. ['RawData', 'Patient1', 'Scan2']
         to_dict : bool, optional
-            Returns the path as key if True. The default is True.
+            Returns the filename as key if True. The default is True.
         as_numpy : bool, optional
             Returns a numpy array otherwise Nifti1Image. The default is True.
         as_image : bool, optional
@@ -700,7 +714,8 @@ class DataObject:
         else:
             raise ValueError('dir_label must be either string or list of strings.')
         #when recursive=False (default) using /** should be the same as /*
-        data_paths = glob(f'{os.path.join(exam_path, dirpath)}/*{substring}*')
+        self.last_dir_path = os.path.join(exam_path, dirpath)
+        data_paths = glob(f'{self.last_dir_path}/*{substring}*')
         data_paths = [path for path in data_paths if os.path.isfile(path)]
         if not data_paths:
             raise FileNotFoundError('Failed to find path to data.')
@@ -724,7 +739,7 @@ class DataObject:
         else:
             return output
     
-    def save_processed_data(self, newdata, dirname, filename, affine, 
+    def save_processed_data(self, newdata, dirname, filename, affine=None, 
                             header=None, msg=True, processing_id=None,
                             subfolders=None, overwrite=True, ext='.nii.gz',
                             prepend=True):
@@ -734,7 +749,7 @@ class DataObject:
 
         Parameters
         ----------
-        newdata : np.ndarray
+        newdata : np.ndarray or nibabel.nifti1.Nifti1Image
         
         dirname : str
             Full name or shortcut of the folder to store the new data.
@@ -768,6 +783,9 @@ class DataObject:
         None.
 
         '''
+        if not isinstance(newdata, (np.ndarray, nib.Nifti1Image)):
+            raise ValueError('newdata must be a numpy array or Nifti1Image.')
+        
         if self.processing_id is None and processing_id is None:
             raise ValueError('No exam being processed at the moment.')
             
@@ -807,7 +825,11 @@ class DataObject:
             filepath = os.path.join(dirpath, f'{filename}{ext}')
         if not overwrite and os.path.isfile(filepath):
             return
-        nifti = nib.Nifti1Image(newdata, affine, header=header)
+        
+        if isinstance(newdata, np.ndarray):
+            nifti = nib.Nifti1Image(newdata, affine, header=header)
+        else:
+            nifti = newdata
         nib.save(nifti, filepath)
     
     def gen_processed_data(self, dirname, substring='', as_image = False):
@@ -853,7 +875,7 @@ class DataObject:
                     arr = nifti.get_fdata()
                 yield nifti, arr, name, exam_id
     
-    def save_bval_bvec(self):
+    def save_bval_bvec(self, identifier):
         '''
         Loads effective b-values and b-vectors from the method file and saves 
         them in BVals folder in processed data folder. Only the first 5 decimal
@@ -866,7 +888,7 @@ class DataObject:
         '''
         rat_overview = self.rat_overview
         #extract the columns with phase contrast study_ids
-        phasecon_cols = [col for col in rat_overview.columns if 'phase contrast' in col.lower()]
+        phasecon_cols = [col for col in rat_overview.columns if identifier in col.lower()]
         phasecon_studies = rat_overview[phasecon_cols]
         _zip = (
             [x[0] for x in self.avail_exams.values()], 

@@ -3,6 +3,7 @@
 Created on Fri Sep  2 14:18:33 2022
 
 @author: Martin Kozár (University of Manchester)
+@contact: martin.kozar@manchester.ac.uk
 """
 
 """
@@ -20,20 +21,21 @@ Run in a virtual environment with the following installed:
     tkinter    8.6
     packaging  21.3
     matplotlib 3.5.1
-
-Note for myself: use BrkRaw2 environment
 """
 
 """
 How to use:
-In your command line activate the appropriate virtual environment (I use 
-conda), then
+In your command line activate the appropriate virtual environment (if you use 
+conda: conda activate <env name>), then
     
     cd {path to directory containing load_bruker.py}
     
     python load_bruker.py -i {path to Bruker data, enclose in "" if it contains 
                              whitespace}
-    
+
+The required folder with Bruker data has the naming convention 
+{scan date}_{scan time}_{study id}_1_1.
+
 The script may require admin priviledges to modify directories and files.
 
 To load a .npy file:
@@ -43,7 +45,7 @@ To load a .npy file:
 
 import brkraw
 from argparse import ArgumentParser
-import os.path
+import os
 import numpy as np
 
 def is_valid_directory(parser, arg):
@@ -71,11 +73,9 @@ def make_dirs(dirpath):
         os.makedirs(dirpath, mode = 0o766)
     return dirpath
 #accept command line argument for dirpath
-#the required folder tends to be named {scan date}_{scan time}_{study id}_1_1
+#the required folder tends to be named "{scan date}_{scan time}_{study id}_1_1"
 #                        provide the full path to this folder ^
 if __name__ == "__main__":
-    #"C:/Users/my_username/OneDrive - The University of Manchester/Uni/
-    # PhD project/Phantom_Studies/Phantom20052022/20220520_141330_220342_1_1"
     parser = ArgumentParser(description="Bruker loader.")
     parser.add_argument("-i", dest="dirpath", required=True,
                         help="Folder containing Bruker data.", metavar="DIR",
@@ -92,15 +92,17 @@ if __name__ == "__main__":
     # bunch of stuff inside scan_id and reco_id, only pulling out a few things
     for scan_id, reco_ids in avail.items():
         #create a new path to save the loaded stuff to
-        newdir = make_dirs(f"{drctry}_loaded/{scan_id}")
+        newdir = make_dirs(os.path.join(f"{drctry}_loaded", "{scan_id}"))
         newdirs.append(newdir)
         acqp = pvdset.get_acqp(scan_id)
         method = pvdset.get_method(scan_id)
-        np.save(f"{newdir}/acqp.npy", acqp.parameters)
-        np.save(f"{newdir}/method.npy", method.parameters)
+        np.save(os.path.join(newdir,"acqp.npy"), acqp.parameters)
+        np.save(os.path.join(newdir,"method.npy"), method.parameters)
+        # there is one method and acqp for the whole study,
+        #  but visu_pars is unique for each reco
         for reco_id in reco_ids:
-            newrecodir = f"{newdir}/pdata/{reco_id}"
+            newrecodir = os.path.join(newdir,"pdata",reco_id)
             pvdset.save_as(scan_id, reco_id, f'niiobj_{reco_id}', 
-                           dir=make_dirs(newrecodir), ext='nii.gz')
+                           dir=make_dirs(newrecodir), ext='nii.gz', slope = True)
             visu_pars = pvdset.get_visu_pars(scan_id, reco_id)
-            np.save(f"{newrecodir}/visu_pars.npy", visu_pars.parameters)
+            np.save(os.path.join(newrecodir,"visu_pars.npy"), visu_pars.parameters)
