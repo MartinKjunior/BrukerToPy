@@ -30,8 +30,8 @@ conda: conda activate <env name>), then
     
     cd {path to directory containing load_bruker.py}
     
-    python load_bruker.py -i {path to Bruker data, enclose in "" if it contains 
-                             whitespace}
+    python load_bruker.py {path to Bruker data, enclose in "" if it contains 
+                             whitespace} -c {one or all}
 
 The required folder with Bruker data has the naming convention 
 {scan date}_{scan time}_{study id}_1_1.
@@ -44,16 +44,16 @@ To load a .npy file:
 """
 
 import brkraw
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 import os
 import numpy as np
+from glob import glob
 
-def is_valid_directory(parser, arg):
-    if not os.path.isdir(arg):
-        parser.error(f"The directory {arg} does not exist! If you have "
-                     "whitespace in your path, enclose the path in quotes.")
+def dir_path(path):
+    if os.path.isdir(path):
+        return path
     else:
-        return arg
+        raise ArgumentTypeError(f"readable_dir:{path} is not a valid path")
     
 def make_dirs(dirpath):
     """
@@ -72,16 +72,19 @@ def make_dirs(dirpath):
     if not os.path.isdir(dirpath):
         os.makedirs(dirpath, mode = 0o766)
     return dirpath
-#accept command line argument for dirpath
-#the required folder tends to be named "{scan date}_{scan time}_{study id}_1_1"
-#                        provide the full path to this folder ^
-if __name__ == "__main__":
-    parser = ArgumentParser(description="Bruker loader.")
-    parser.add_argument("-i", dest="dirpath", required=True,
-                        help="Folder containing Bruker data.", metavar="DIR",
-                        type=lambda x: is_valid_directory(parser, x))
-    #vars(.parse_args) gives a dictionary of arguments, pull out dirpath
-    drctry = vars(parser.parse_args())["dirpath"]
+
+def extract_paths(directories, overwrite = False):
+    output = []
+    for sub_dir in directories:
+        if sub_dir.endswith("_loaded") and not overwrite:
+            #remove the same path without _loaded
+            output.remove(sub_dir[:-7])
+        else:
+            output.append(sub_dir)
+    return output
+
+def load_brk(drctry):
+    print(f"Loading data from {drctry}")
     #brkraw takes care of the complexity of loading and verifying exams
     pvdset = brkraw.load(drctry)
     #dictionary of available scans of the form
@@ -92,7 +95,7 @@ if __name__ == "__main__":
     # bunch of stuff inside scan_id and reco_id, only pulling out a few things
     for scan_id, reco_ids in avail.items():
         #create a new path to save the loaded stuff to
-        newdir = make_dirs(os.path.join(f"{drctry}_loaded", "{scan_id}"))
+        newdir = make_dirs(os.path.join(f"{drctry}_loaded", str(scan_id)))
         newdirs.append(newdir)
         acqp = pvdset.get_acqp(scan_id)
         method = pvdset.get_method(scan_id)
@@ -101,8 +104,51 @@ if __name__ == "__main__":
         # there is one method and acqp for the whole study,
         #  but visu_pars is unique for each reco
         for reco_id in reco_ids:
-            newrecodir = os.path.join(newdir,"pdata",reco_id)
+            newrecodir = os.path.join(newdir,"pdata",str(reco_id))
             pvdset.save_as(scan_id, reco_id, f'niiobj_{reco_id}', 
                            dir=make_dirs(newrecodir), ext='nii.gz', slope = True)
             visu_pars = pvdset.get_visu_pars(scan_id, reco_id)
             np.save(os.path.join(newrecodir,"visu_pars.npy"), visu_pars.parameters)
+
+#accept command line argument for dirpath
+#the required folder tends to be named "{scan date}_{scan time}_{study id}_1_1"
+#                        provide the full path to this folder ^
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        prog="load_bruker.py",
+        description="Loads Bruker data and saves it in a more accessible format."
+        )
+    parser.add_argument(
+        "dirpath", 
+        type=dir_path, 
+        help="Path to the directory containing the Bruker data. If count is 'all'," \
+            + " this should be the parent directory of the folders containing the Bruker data.", 
+        metavar="dir"
+        )
+    parser.add_argument(
+        "-c",
+        "--count",
+        type=str,
+        default="one",
+        help="How to load the Bruker data. Options: 'one' (folder) or 'all' (folders). Default: 'one'.",
+        required=False,
+        choices=["one", "all"]
+    )
+    parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing '_loaded' folders. Default: False.",
+        required=False
+    )
+    args = parser.parse_args()
+    drctry = args.dirpath
+    count = args.count
+    overwrite = args.overwrite
+    
+    if count == "one":
+        load_brk(drctry)
+    elif count == "all":
+        directories = extract_paths(glob(drctry + "/*"), overwrite)
+        for sub_drctry in directories:
+            load_brk(sub_drctry)
