@@ -7,11 +7,10 @@ visu_pars files). Firstly run load_bruker.py through command prompt/terminal
 Once loaded using load_bruker.py:
 ```
 import bruker_to_py as btp
-import pprint
+from pathlib import Path
 
-data_obj = btp.DataObject(dir_path)
-data_obj.load_exams()
-pprint(data_obj.avail_exams)
+cwd = Path.cwd()
+D_obj = btp.init(str(cwd))
 ```
 
 Main issues that may be encountered using these scripts would probably have to
