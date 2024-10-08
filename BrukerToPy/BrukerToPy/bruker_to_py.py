@@ -587,7 +587,14 @@ class DataObject:
 
         Returns
         -------
-        None.
+        dict[
+            str:int,
+            str:int,
+            str:OrderedDict,
+            str:np.ndarray/Nifti1Image,
+            str:dict
+        ] 
+        or None if to_self is True.
 
         '''
         #To do: add support for loading sitk.Image, however this could lead to
