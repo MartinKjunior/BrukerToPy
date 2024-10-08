@@ -19,6 +19,7 @@ sitk = None
 from pathlib import Path
 from glob import glob
 from pprint import pprint
+from typing import Iterable
 
 def init(path: str, msg: bool = True) -> 'DataObject':
     data_object = DataObject(path)
@@ -919,7 +920,8 @@ class DataObject:
                     arr = nifti.get_fdata()
                 yield nifti, arr, name, exam_id
     
-    def save_bval_bvec(self, identifier: str, round: bool = True, ext: bool = False):
+    def save_bval_bvec(self, identifier: str|Iterable[Iterable[int]], 
+                       round: bool = True, ext: bool = False):
         '''
         Loads effective b-values and b-vectors from the method file and saves 
         them in BVals folder in processed data folder. Only the first 5 decimal
@@ -928,18 +930,30 @@ class DataObject:
 
         Parameters
         ----------
-        identifier : str
-            Column name in rat_overview to identify the phase contrast study_ids.
+        identifier : str|Iterable[Iterable[int]]
+            If str, column name in rat_overview to identify the phase contrast study_ids.
+            If Iterable, an iterable containing exam_ids and study_ids.
+                For example, ([1, 2, 3], [1, 2, 3]) will load the data for 
+                exam_id, scan_id = 1, 1, then exam_id, scan_id = 2,2...
+            Iterables are for example lists, tuples, sets, arrays...
+        round : bool, optional
+            Rounds b-values to the nearest hundred. The default is True.
+        ext : bool, optional
+            Adds the file extension to the file name. The default is False.
 
         Returns
         -------
         None.
 
         '''
-        rat_overview = self.rat_overview.dropna(subset=[identifier])
-        #extract the columns with phase contrast study_ids
-        exam_ids: pd.Series = rat_overview['Study ID'].astype(int)
-        study_ids: pd.Series = rat_overview[identifier].astype(int)
+        if isinstance(identifier, str):
+            rat_overview = self.rat_overview.dropna(subset=[identifier])
+            #extract the columns with phase contrast study_ids
+            exam_ids: pd.Series = rat_overview['Study ID'].astype(int)
+            study_ids: pd.Series = rat_overview[identifier].astype(int)
+        elif isinstance(identifier, Iterable):
+            exam_ids = pd.Series(identifier[0])
+            study_ids = pd.Series(identifier[1])
         _zip = (
             [values[0] for key, values in self.avail_exams.items() if int(key) in exam_ids.values], 
             [savedir for savedir in self.savedirs if int(savedir[-10:-4]) in exam_ids.values], 
