@@ -327,8 +327,7 @@ class DataObject:
     Class for handling raw Bruker and processed data.
     
     Attributes:
-        path - string containing path to the Bruker data folder, or a list of
-                paths if both raw and loaded data are stored in separate folders
+        path - string containing path to the Bruker data folder
         avail_exams - dictionary of the form {exam_id: [BrPyLoader, {scan_id:[reco_id,...]}]}
         paths - list of all Bruker folders within path
         paths_loaded - list of Bruker folders loaded into niftis
@@ -347,7 +346,7 @@ class DataObject:
     '''
     
     def __init__(self, path = ""):
-        if not self._check_path(path):
+        if not os.path.isdir(path):
             raise ValueError(f"Invalid path input: {path}")
 
         self.path            = path
@@ -370,22 +369,14 @@ class DataObject:
         self.rat_overview    = self._get_rat_overview()
         #isinstance(n, self.int) will accept any integer now
         self.int = (int, np.integer)
-    
-    def _check_path(self, path: str|list[str]) -> bool:
-        if isinstance(path, str):
-            return os.path.isdir(path)
-        elif isinstance(path, list):
-            return all(os.path.isdir(p) for p in path)
         
     def _get_paths(self):
         '''
         Parameters
         ----------
-        path : str|list[str]
+        path : str
             Path to folder containing all Bruker folders (Bruker folder names 
             have the form "{scan date}_{scan time}_{exam id}_1_1".
-            Alternatively, a list of paths can be passed. Expecting one for raw
-            data and one for loaded data.
 
         Returns
         -------
@@ -397,12 +388,7 @@ class DataObject:
             Raw Bruker folders.
 
         '''
-        if isinstance(self.path, str):
-            all_p = glob(f"{self.path}/*")
-        elif isinstance(self.path, list):
-            all_p = []
-            for p in self.path:
-                all_p += glob(f"{p}/*")
+        all_p = glob(f"{self.path}/*")
         #Sort in case glob returns them in reverse order
         all_p = sorted(all_p, key = lambda x: int(os.path.basename(x).split('_')[2]))
         p_loaded = [x for x in all_p if x.endswith("_loaded")]
@@ -418,7 +404,7 @@ class DataObject:
             List of {exam id}s from the Bruker folder names.
 
         '''
-        return [os.path.basename(x).split('_')[-3] for x in self.paths_raw]
+        return [os.path.basename(x).replace('_loaded', '').split('_')[-3] for x in self.paths_loaded]
     
     def _prepare_savedir_paths(self):
         '''
@@ -430,8 +416,8 @@ class DataObject:
 
         '''
         savedirs = []
-        for path in self.paths_raw:
-            p = Path(path)
+        for path in self.paths_loaded:
+            p = Path(path.replace('_loaded', ''))
             parts = list(p.parts)
             parts[-2] = 'Processed_' + parts[-2]
             savedir = os.path.join(*parts)
