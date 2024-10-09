@@ -327,7 +327,8 @@ class DataObject:
     Class for handling raw Bruker and processed data.
     
     Attributes:
-        path - string containing path to the Bruker data folder
+        path - string containing path to the Bruker data folder, or a list of
+                paths if both raw and loaded data are stored in separate folders
         avail_exams - dictionary of the form {exam_id: [BrPyLoader, {scan_id:[reco_id,...]}]}
         paths - list of all Bruker folders within path
         paths_loaded - list of Bruker folders loaded into niftis
@@ -346,7 +347,7 @@ class DataObject:
     '''
     
     def __init__(self, path = ""):
-        if not os.path.isdir(path):
+        if not self._check_path(path):
             raise ValueError(f"Invalid path input: {path}")
 
         self.path            = path
@@ -369,14 +370,22 @@ class DataObject:
         self.rat_overview    = self._get_rat_overview()
         #isinstance(n, self.int) will accept any integer now
         self.int = (int, np.integer)
+    
+    def _check_path(self, path: str|list[str]) -> bool:
+        if isinstance(path, str):
+            return os.path.isdir(path)
+        elif isinstance(path, list):
+            return all(os.path.isdir(p) for p in path)
         
     def _get_paths(self):
         '''
         Parameters
         ----------
-        path : str
+        path : str|list[str]
             Path to folder containing all Bruker folders (Bruker folder names 
             have the form "{scan date}_{scan time}_{exam id}_1_1".
+            Alternatively, a list of paths can be passed. Expecting one for raw
+            data and one for loaded data.
 
         Returns
         -------
@@ -388,7 +397,12 @@ class DataObject:
             Raw Bruker folders.
 
         '''
-        all_p = glob(f"{self.path}/*")
+        if isinstance(self.path, str):
+            all_p = glob(f"{self.path}/*")
+        elif isinstance(self.path, list):
+            all_p = []
+            for p in self.path:
+                all_p += glob(f"{p}/*")
         #Sort in case glob returns them in reverse order
         all_p = sorted(all_p, key = lambda x: int(os.path.basename(x).split('_')[2]))
         p_loaded = [x for x in all_p if x.endswith("_loaded")]
