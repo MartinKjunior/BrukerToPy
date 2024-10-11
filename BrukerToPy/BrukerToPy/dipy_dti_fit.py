@@ -5,7 +5,6 @@ import numpy as np
 import nibabel as nib
 import bruker_to_py as btp
 from pathlib import Path
-from inspect import cleandoc
 from collections import OrderedDict
 
 import dipy.reconst.dti as dti
@@ -402,13 +401,13 @@ class DiPyDTI():
             self.load_data(**paths_dict)
     
     def __str__(self) -> str:
-        return cleandoc(f"""Paths:
+        return f"""Paths:
         -----
         Data: {self.data_path}
         Bvals: {self.bvals_path}
         Bvecs: {self.bvecs_path}
         Mask: {self.mask_path}
-        Savedir: {self.savedir}""")
+        Savedir: {self.savedir}"""
     
     def __repr__(self) -> str:
         paths_dict = DiPyDTI.make_paths_dict(
@@ -867,19 +866,17 @@ class DiPyDTI():
         "Log the pipeline parameters to a text file."
         file_timestr = time.strftime("%Y%m%d-%H%M%S")
         timestr = time.strftime("%Y-%m-%d %H:%M:%S")
-        log_msg = cleandoc(
-            f"""{timestr} - Ran the DiPyDTI pipeline on the following data:
+        log_msg = f"""{timestr} - Ran the DiPyDTI pipeline on the following data:
 
-            {str(self)}
+{str(self)}
 
-            The pipeline steps were:
-            {pipeline}
+The pipeline steps were:
+{pipeline}
 
-            Additional keyword arguments were:
-            {pprint.pformat(kwargs)}
-            
-            If a step was successful, it will be logged here:"""
-            )
+Additional keyword arguments were:
+{pprint.pformat(kwargs, indent = 4)}
+
+If a step was successful, it will be logged here:"""
         self.logfile = self.savedir / f'DiPyDTI_log_{file_timestr}.txt'
         with open(self.logfile, 'w') as f:
             f.write(log_msg)
