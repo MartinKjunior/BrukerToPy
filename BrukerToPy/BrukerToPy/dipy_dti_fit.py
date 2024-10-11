@@ -461,8 +461,8 @@ class DiPyDTI():
         else:
             self.num_reps = num_reps
         if self.num_reps != 1:
-            self.bvals = np.repeat(self.bvals, self.num_reps, axis=0)
-            self.bvecs = np.repeat(self.bvecs, self.num_reps, axis=0)
+            self.bvals = np.tile(self.bvals, self.num_reps)
+            self.bvecs = np.tile(self.bvecs, (self.num_reps, 1))
         self._check_loaded_data()
     
     def run_pipeline(
@@ -823,14 +823,14 @@ class DiPyDTI():
         # Bvals and bvecs
         if not isinstance(self.bvals, np.ndarray) or self.bvals.ndim != 1:
             raise ValueError("BVals should be a 1D numpy array.")
-        if len(self.bvals) != self.diffusion_data.shape[-1] // self.num_reps:
+        if len(self.bvals) != self.diffusion_data.shape[-1]:
             raise ValueError("Number of bvals should match the number of "
                              "volumes (diffusion directions).")
         if not isinstance(self.bvecs, np.ndarray) or self.bvecs.ndim != 2:
             raise ValueError("BVecs should be a 2D numpy array.")
         if self.bvecs.shape[1] != 3:
             raise ValueError("BVecs should have 3 columns.")
-        if self.bvecs.shape[0] != self.diffusion_data.shape[-1] // self.num_reps:
+        if self.bvecs.shape[0] != self.diffusion_data.shape[-1]:
             raise ValueError("Number of bvecs should match the number of "
                              "volumes (diffusion directions).")
         # Mask
