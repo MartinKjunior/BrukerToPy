@@ -285,13 +285,14 @@ class DiPyDTI():
         The denoised data.
     model : dti.TensorModel
         The tensor model.
-    tensorfits : list[dti.TensorFit]
-        The tensor fits.
+    dti_fit : dti.TensorFit
+        The final DTI fit.
     
     Methods:
     --------
     run_pipeline(pipeline: list = ["motion_correction", "denoise", "fit_dti"],
-                    kwargs: dict[dict] = {}, store_tensors: bool = False)
+                    kwargs: dict[dict] = {}, store_tensors: bool = False
+                    ) -> None|dti.TensorFit
         Run a pipeline of processing steps. The default pipeline is in
         self.valid_steps (defined in __init__). After motion correction, the 
         data is averaged if there are multiple repetitions.
@@ -397,6 +398,7 @@ class DiPyDTI():
         self.gibbs_suppressed: nib.Nifti1Image = None
         self.denoised_data: nib.Nifti1Image = None
         self.model: dti.TensorModel = None
+        self.dti_fit: dti.TensorFit = None
         if paths_dict is not None:
             self.load_data(**paths_dict)
     
@@ -417,7 +419,7 @@ class DiPyDTI():
         return f"DiPyDTI(paths_dict={paths_dict})"
     
     def load_data(self, data_path: str, bvals_path: str, bvecs_path: str, 
-                  mask_path: str = "", **kwargs):
+                  mask_path: str = "", num_reps: int = 1, **kwargs):
         """Load the data, bvals, bvecs, and mask (if provided) into the DiPyDTI 
         object. Optionally set the savedir, method, acqp, and visu_pars. If 
         method file is provided, the number of repetitions will be extracted 
@@ -456,12 +458,17 @@ class DiPyDTI():
             self.visu_pars = kwargs.get('visu_pars')
         if self.method is not None:
             self.num_reps = self.method['PVM_NRepetitions']
+        else:
+            self.num_reps = num_reps
+        if self.num_reps != 1:
+            self.bvals = np.repeat(self.bvals, self.num_reps, axis=0)
+            self.bvecs = np.repeat(self.bvecs, self.num_reps, axis=0)
         self._check_loaded_data()
     
     def run_pipeline(
         self, 
         pipeline: list = ["motion_correction", "denoise", "fit_dti"], 
-        kwargs: dict[dict] = {}):
+        kwargs: dict[dict] = {}) -> None|dti.TensorFit:
         """Run a pipeline of processing steps. The default pipeline is
         in self.valid_steps (defined in __init__). After motion correction,
         the data is averaged if there are multiple repetitions.
@@ -520,6 +527,8 @@ class DiPyDTI():
                     self.fit_dti(current_data, **dti_fit_kwargs)
                     self._log_step(step)
                     return self.dti_fit
+                elif step == "motion_correction":
+                    pass
                 else:
                     raise ValueError(f"Step {step} not recognized in the "
                                      "pipeline.")
@@ -592,6 +601,8 @@ class DiPyDTI():
         data_averaged = data.mean(axis=-1)
         self.averaged_data = self.to_nifti(nifti, data_averaged)
         self.num_reps = 1
+        self.bvecs = self.bvecs[:data_averaged.shape[-1]]
+        self.bvals = self.bvals[:data_averaged.shape[-1]]
         if save:
             self.save(
                 self.averaged_data, 
@@ -812,14 +823,14 @@ class DiPyDTI():
         # Bvals and bvecs
         if not isinstance(self.bvals, np.ndarray) or self.bvals.ndim != 1:
             raise ValueError("BVals should be a 1D numpy array.")
-        if len(self.bvals) != self.diffusion_data.shape[-1]:
+        if len(self.bvals) != self.diffusion_data.shape[-1] // self.num_reps:
             raise ValueError("Number of bvals should match the number of "
                              "volumes (diffusion directions).")
         if not isinstance(self.bvecs, np.ndarray) or self.bvecs.ndim != 2:
             raise ValueError("BVecs should be a 2D numpy array.")
         if self.bvecs.shape[1] != 3:
             raise ValueError("BVecs should have 3 columns.")
-        if self.bvecs.shape[0] != self.diffusion_data.shape[-1]:
+        if self.bvecs.shape[0] != self.diffusion_data.shape[-1] // self.num_reps:
             raise ValueError("Number of bvecs should match the number of "
                              "volumes (diffusion directions).")
         # Mask
