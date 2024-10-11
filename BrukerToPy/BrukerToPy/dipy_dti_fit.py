@@ -397,7 +397,6 @@ class DiPyDTI():
         self.gibbs_suppressed: nib.Nifti1Image = None
         self.denoised_data: nib.Nifti1Image = None
         self.model: dti.TensorModel = None
-        self.tensorfits: list[dti.TensorFit] = []
         if paths_dict is not None:
             self.load_data(**paths_dict)
     
@@ -462,7 +461,7 @@ class DiPyDTI():
     def run_pipeline(
         self, 
         pipeline: list = ["motion_correction", "denoise", "fit_dti"], 
-        kwargs: dict[dict] = {}, store_tensors: bool = False):
+        kwargs: dict[dict] = {}):
         """Run a pipeline of processing steps. The default pipeline is
         in self.valid_steps (defined in __init__). After motion correction,
         the data is averaged if there are multiple repetitions.
@@ -477,9 +476,6 @@ class DiPyDTI():
             should be a dictionary with keys corresponding to the steps in the 
             pipeline and values should be dictionaries of additional arguments 
             to pass into each step, by default {}
-        store_tensors : bool, optional
-            Whether to store the tensor fits in the tensorfits attribute,
-            by default False
             
         Raises
         ------
@@ -522,8 +518,8 @@ class DiPyDTI():
                 elif step == "fit_dti":
                     dti_fit_kwargs = kwargs.get('fit_dti', {})
                     self.fit_dti(current_data, **dti_fit_kwargs)
-                    if store_tensors:
-                        self.tensorfits.append(self.dti_fit)
+                    self._log_step(step)
+                    return self.dti_fit
                 else:
                     raise ValueError(f"Step {step} not recognized in the "
                                      "pipeline.")
