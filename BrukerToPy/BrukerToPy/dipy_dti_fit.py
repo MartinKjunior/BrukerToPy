@@ -34,7 +34,7 @@ class DiPyPathHandler:
     D_obj : btp.DataObject
         The DataObject instance from bruker_to_py.py.
     exam_id : int|str
-        The exam id, e.g. 230215.
+        The exam id (MR number), e.g. 230215.
     reco_id : int, optional
         The reco id of the diffusion scans, e.g. 1.
     tree : bool, optional
@@ -108,10 +108,11 @@ class DiPyPathHandler:
 
         Parameters
         ----------
+        dti_col : str
+            The column in self.D.rat_overview to check for the scan id.
         scan_id : int, optional
             The scan id. If None, the scan id will be found based on the exam 
             id, by default None
-        
         id_col : str, optional
             The column in self.D.rat_overview to check for the exam id, 
             by default "Study ID"
