@@ -19,17 +19,19 @@ Once loaded, use `bruker_to_py.py`:
 import bruker_to_py as btp
 from pathlib import Path
 
-cwd = Path.cwd()
-D_obj = btp.init(str(cwd))
+cwd = Path.cwd() # Should be the path to rat data, not the script
+D_obj = btp.init(str(cwd), msg=False, animal_overview="animal_overview.xlsx")
 ```
-
-Main issues that may be encountered using these scripts would probably have to do with paths. Let me know if you encounter issues by making a new issue and I can fix them.
 
 ### Allows to do DTI processing of bruker data using DiPy package:
 
 **Prerequisites:**
 
 Diffusion processing requires knowing the diffusion gradient strengths used to generate your image. These are found in the methods files that come with the diffusion data. bval is `'PVM_DwEffBval'` and bvec is `'PVM_DwGradVec'`. These need to be stored as text files, each value separated by comma. The `DataObject` from `bruker_to_py` has function `save_bval_bvec` to automatically read in, process and save bvals and bvecs. To run DiPyDTI, you need at least: your diffusion data as nifti, bvals and bvecs files (a brain mask is optional to save time computing the DTI fit).
+
+`DiPyPathHandler` from `dipy_dti_fit.py` provides a convenient way of fetching the required data paths. It requires a csv-like file with at least 2 columns 
+showing the animal's exam_id and scan_id to identify the DTI datasets. This is 
+the third input for `btp.init()`, or second input to `btp.DataObject()`.
 
 **Example using paths to files:**
 ```py
@@ -57,6 +59,13 @@ for exam_id in D_obj.avail_exam_ids:
         pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
         kwargs = {'degibbs':{'num_processes':3}}
         )
+```
+
+**Example of running DiPyDTI on multiple cores in parallel:**
+```py
+from dipy_dti_fit import multiprocess_DTI
+path = str(Path.cwd().parent / 'MRI_data')
+multiprocess_DTI(path, dti_col = 'dti', id_col = 'MR #', n_jobs = 3)
 ```
 
 ## References

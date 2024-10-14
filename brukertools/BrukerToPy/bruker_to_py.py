@@ -21,8 +21,9 @@ from glob import glob
 from pprint import pprint
 from typing import Iterable
 
-def init(path: str, msg: bool = True) -> 'DataObject':
-    data_object = DataObject(path)
+def init(path: str, msg: bool = True, 
+         animal_overview: str = "Rat_Overview.xlsx") -> 'DataObject':
+    data_object = DataObject(path, animal_overview)
     data_object.load_exams(msg = msg)
     return data_object
 
@@ -333,7 +334,8 @@ class DataObject:
         paths_loaded - list of Bruker folders loaded into niftis
         paths_raw - list of raw Bruker folders
         avail_exam_ids - list of {exam id}s from the Bruker folder names
-        rat_overview - dataframe containing information about the rats and their data ids
+        animal_overview - filename or absolute path to a dataframe containing 
+        information about the animals and their data ids
     
     Methods:
         pull_exam_data - fetches raw data from a specified exam
@@ -345,7 +347,7 @@ class DataObject:
         get_savedir - returns the path to the processed data folder
     '''
     
-    def __init__(self, path = ""):
+    def __init__(self, path = "", animal_overview = "Rat_Overview.xlsx"):
         if not os.path.isdir(path):
             raise ValueError(f"Invalid path input: {path}")
 
@@ -366,7 +368,7 @@ class DataObject:
         self.avail_exam_ids  = self._get_exam_ids()
         self.savedirs        = self._prepare_savedir_paths()
         self.processed_dirs  = self._find_processed_dirs()
-        self.rat_overview    = self._get_rat_overview()
+        self.animal_overview = self._get_animal_overview(animal_overview)
         #isinstance(n, self.int) will accept any integer now
         self.int = (int, np.integer)
         
@@ -444,27 +446,39 @@ class DataObject:
                              'uppercase letters in their names.')
         return dict(zip(shortnames, basenames))
     
-    def _get_rat_overview(self) -> pd.DataFrame:
+    def _get_animal_overview(self, filename) -> pd.DataFrame:
         '''
-        Load the Rat_Overview file and remove the entries without data.
-        Rat_Overview should be an excel file containing information about the 
-        rats and which study_ids contain various scans. For example, my file 
-        has the following columns: 
+        Load the animal_overview file and remove the entries without data.
+        animal_overview should be an excel file containing information about the 
+        animals and which study_ids contain various scans. For example:
             ['Date', 'ID', 'Ear tag', 'Animal kind', 'Animal type', 'Study ID',
              'Date of birth', 'Age (days)', 'Anatomical highres 2D',
              'Anatomical highres CSF 3D', 'Phase contrast 200ms',
              'Phase contrast 125ms', 'b0 map']
 
+        Attributes
+        ----------
+        filename : str
+            Name of the animal overview file.
+        
         Returns
         -------
         pd.DataFrame
 
         '''
-        overview_path = os.path.join(os.path.dirname(self.path), 'Rat_Overview.xlsx')
+        if os.path.isabs(filename):
+            overview_path = filename
+        else:
+            overview_path = os.path.join(os.path.dirname(self.path), filename)
         try:
-            return pd.read_excel(overview_path)
+            if os.path.suffix(overview_path) == '.csv':
+                return pd.read_csv(overview_path)
+            elif os.path.suffix(overview_path) == '.xlsx':
+                return pd.read_excel(overview_path)
+            else:
+                raise ValueError('Unsupported file type. Please use .csv or .xlsx.')
         except Exception as e:
-            print(f'Warning: Rat_Overview file could not be loaded from {overview_path}.')
+            print(f'Warning: {filename} file could not be loaded!')
             print(e)
             return None
     
@@ -931,7 +945,7 @@ class DataObject:
         Parameters
         ----------
         identifier : str|Iterable[Iterable[int]]
-            If str, column name in rat_overview to identify the phase contrast study_ids.
+            If str, column name in animal_overview to identify the phase contrast study_ids.
             If Iterable, an iterable containing exam_ids and study_ids.
                 For example, ([1, 2, 3], [1, 2, 3]) will load the data for 
                 exam_id, scan_id = 1, 1, then exam_id, scan_id = 2,2...
@@ -947,10 +961,10 @@ class DataObject:
 
         '''
         if isinstance(identifier, str):
-            rat_overview = self.rat_overview.dropna(subset=[identifier])
+            animal_overview = self.animal_overview.dropna(subset=[identifier])
             #extract the columns with phase contrast study_ids
-            exam_ids: pd.Series = rat_overview['Study ID'].astype(int)
-            study_ids: pd.Series = rat_overview[identifier].astype(int)
+            exam_ids: pd.Series = animal_overview['Study ID'].astype(int)
+            study_ids: pd.Series = animal_overview[identifier].astype(int)
         elif isinstance(identifier, Iterable):
             exam_ids = pd.Series(identifier[0])
             study_ids = pd.Series(identifier[1])
@@ -1076,9 +1090,8 @@ class DataObject:
         return next((p for p in self.savedirs if str(exam_id) in p), None)
 
 # def load_bruker(path, fix_DWI_shape = True, endswith = '_1_1'):
-#     'BrkRaw does not with in python 3.9.15 for some reason.'
+#     'BrkRaw does not work in python 3.9.15 for some reason.'
 #     import brkraw
-#     #C:/Users/mbcxamk2/OneDrive - The University of Manchester/Uni/PhD project/Rat_studies/Rat_MRI_data
 #     paths = glob(f'{path}/*{endswith}')
 #     for drctry in paths:
 #         #chr(92) is a backslash but f-strings don't allow them yet

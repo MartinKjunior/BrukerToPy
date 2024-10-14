@@ -156,13 +156,14 @@ class DiPyPathHandler:
         id.
     """
     def __init__(self, D_obj: Any|str, exam_id: int|str, 
-                 reco_id: int = 1, msg: bool = False) -> None:
+                 reco_id: int = 1, msg: bool = False, 
+                 animal_overview: str = "Rat_Overview.xlsx") -> None:
         if btp is None:
             raise ImportError("bruker_to_py not found.")
         if isinstance(D_obj, str):
             if not Path(D_obj).exists():
                 raise FileNotFoundError(f'{D_obj} does not exist.')
-            D_obj = btp.init(D_obj, msg=msg)
+            D_obj = btp.init(D_obj, msg=msg, animal_overview=animal_overview)
         self.D = D_obj
         self.exam_id = int(exam_id)
         self.reco_id = reco_id
@@ -370,7 +371,7 @@ class DiPyDTI():
     Default pipeline changes to DiPy default values (and original defaults):
         - The motion_correction step uses the pipeline of 
         ['center_of_mass', 'translation', 'rigid'] (no 'affine').
-        - The degibbs step uses the deault n_points of 2 (3).
+        - The degibbs step uses the default n_points of 2 (3).
         - The median_otsu function used in extract_brain uses the default
         parameters of median_radius=2, numpass=1 (4, 4).
     
