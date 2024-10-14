@@ -90,6 +90,8 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
     """
     if btp is None:
         raise ImportError("bruker_to_py not found.")
+    if WorkerPool is None:
+        raise ImportError("mpire not found.")
     if kwargs.get('degibbs', {}).get('num_processes', 1) != 1:
         raise ValueError("No additional processes allowed for degibbs.")
     D_obj = init(path, msg=False)
@@ -261,6 +263,15 @@ class DiPyDTI():
     correction and repetitions are averaged before the other steps. bvals and 
     bvecs are automatically prepared for multiple repetitions by repeating them 
     num_reps times.
+    
+    Definitions of ID numbers (following brkraw naming convention):
+        - Exam ID: The MR number, number of a new exam card in paravision, 
+        e.g. 230215.
+        - Scan ID: The number of the scan, e.g. 10, shown in paravision as E10 
+        on the exam card.
+        - Reco ID: The reconstruction number, e.g. 1. The default image is 1, 
+        any additional processing, such as returning phase images, will have
+        a different reco id. Diffusion images are usually reco id 1.
     
     Example usage:
     --------------
@@ -565,7 +576,8 @@ Savedir: {self.savedir}"""
         """Load the data, bvals, bvecs, and mask (if provided) into the DiPyDTI 
         object. Optionally set the savedir, method, acqp, and visu_pars. If 
         method file is provided, the number of repetitions will be extracted 
-        from it.
+        from it. exam_id and scan_id can be set manually as kwargs, otherwise
+        they will be extracted from the data path.
 
         Parameters
         ----------

@@ -4,7 +4,9 @@ Functions used to process data from a pre-clinical Bruker MRI scanner using
 ParaVision 6.0.1. The main idea is to turn the raw scanner data into python 
 format (nifti files for data and ordered dictionaries for acqp, method and 
 visu_pars files). Firstly run load_bruker.py through command prompt/terminal 
-(instructions inside), then use bruker_to_py.py to (easily) access the data. ***Warning:*** `load_bruker.py` was only tested with python=3.7 and bruker=0.3.7. `dipy_dti_fit.py` requires at least python=3.10.
+(instructions inside), then use bruker_to_py.py to (easily) access the data. 
+
+***Warning:*** `load_bruker.py` was only tested with python=3.7 and bruker=0.3.7. `dipy_dti_fit.py` requires at least python=3.10.
 
 The data is loaded using the CLI script `load_bruker.py`:
 ```py
@@ -33,8 +35,14 @@ Diffusion processing requires knowing the diffusion gradient strengths used to g
 ```py
 # DiPyDTI can be instantiated using paths to the necessary files
 # Suppose you have found the paths to your files and stored them as strings
-dti = DiPyDTI()
-dti.load_data(data_path, bvals_path, bvecs_path, savedir=savedir_path)
+# A new subfolder "DiPyDTI" will be created in savedir to store the outputs
+from dipy_dti_fit import DiPyDTI
+dpdti = DiPyDTI()
+dpdti.load_data(
+    data_path, bvals_path, bvecs_path, savedir=savedir_path, exam_id=230215, 
+    scan_id=6
+    )
+dpdti.run_pipeline()
 ```
 
 **Example using the bruker_to_py.py objects:**
