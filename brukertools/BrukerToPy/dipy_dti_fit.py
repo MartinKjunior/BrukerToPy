@@ -299,14 +299,16 @@ class DiPyDTI():
     D_obj = init(path, msg=False)
     for exam_id in D_obj.avail_exam_ids:
         path_handler = DiPyPathHandler(D_obj, exam_id)
-        dpdti = DiPyDTI(path_handler.get_data_paths('dti', return_metadata=True))
+        dpdti = DiPyDTI(
+            path_handler.get_data_paths('dti', return_metadata=True)
+            )
         dpdti.run_pipeline(
             pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
             kwargs = {'degibbs':{'num_processes':3}}
             )
     
     Explanation of the main methods:
-    -------------------------------
+    --------------------------------
     Loading data:
         - The load_data method takes in paths to the diffusion data, bvals, 
         bvecs, and mask (if available) and loads them into the DiPyDTI object. 
@@ -315,7 +317,7 @@ class DiPyDTI():
         - Alternatively, the DiPyPathHandler class can be used to find the scan 
         id and get the paths, but it expects a DataObject instance from 
         bruker_to_py.py. It can also return the methods, acqp, and visu_pars
-        dictionaries. Method is used to extract the number of repetitions, or
+        dictionaries. Method is used to extract the number of repetitions, which
         can be set manually using the num_reps attribute.
         - If you have the paths, you can use the DiPyDTI.make_paths_dict method 
         to create the dictionary of paths.
@@ -354,16 +356,18 @@ class DiPyDTI():
         the pipeline and the values should be dictionaries of additional 
         arguments to pass into each step.
         
-    Default pipeline changes to DiPy default values:
-        - The motion_correction step uses the default pipeline of 
+    Default pipeline changes to DiPy default values (and original defaults):
+        - The motion_correction step uses the pipeline of 
         ['center_of_mass', 'translation', 'rigid'] (no 'affine').
-        - The degibbs step uses the deault n_points of 2.
-        - The denoise step uses the default method of 'mppca'.
+        - The degibbs step uses the deault n_points of 2 (3).
         - The median_otsu function used in extract_brain uses the default
-        parameters of median_radius=2, numpass=1.
-        - The fit_dti step uses the default model of 'WLS'.
-        - The estimate_noise function used in RESTORE model uses the default 
-        estimator piesno.
+        parameters of median_radius=2, numpass=1 (4, 4).
+    
+    Default choices for algorithm selection:
+        - The denoise step uses the method 'mppca'.
+        - The fit_dti step uses the model 'WLS'.
+        - The estimate_noise function used in RESTORE model uses the estimator 
+        'piesno'.
         
     Attributes:
     -----------
