@@ -27,7 +27,7 @@ Main issues that may be encountered using these scripts would probably have to d
 
 **Prerequisites:**
 
-Diffusion processing requires knowing the diffusion gradient strengths used to generate your image. These are found in the methods files that come with the diffusion data. bval is `'PVM_DwEffBval'` and bvec is `'PVM_DwGradVec'`. These need to be stored as text files, each value separated by comma. The `DataObject` from `bruker_to_py` has function `save_bval_bvec` to automatically read in, process and save bvals and bvecs. To run DiPyDTI, you need at least: your diffusion data as nifti, bvals and bvecs files.
+Diffusion processing requires knowing the diffusion gradient strengths used to generate your image. These are found in the methods files that come with the diffusion data. bval is `'PVM_DwEffBval'` and bvec is `'PVM_DwGradVec'`. These need to be stored as text files, each value separated by comma. The `DataObject` from `bruker_to_py` has function `save_bval_bvec` to automatically read in, process and save bvals and bvecs. To run DiPyDTI, you need at least: your diffusion data as nifti, bvals and bvecs files (a brain mask is optional to save time computing the DTI fit).
 
 **Example using paths to files:**
 ```py
