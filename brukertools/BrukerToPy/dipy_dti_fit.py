@@ -96,12 +96,11 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
         raise ValueError("No additional processes allowed for degibbs.")
     D_obj = init(path, msg=False)
     with WorkerPool(n_jobs) as pool:
-        results = pool.map(
+        pool.imap_unordered(
             _multiprocess_DTI_helper, 
             [(D_obj, exam_id, dti_col, id_col, pipeline, kwargs) 
              for exam_id in D_obj.avail_exam_ids]
             )
-    return results
 
 def _multiprocess_DTI_helper(D_obj, exam_id, dti_col, id_col, pipeline, kwargs):
     path_handler = DiPyPathHandler(D_obj, exam_id)
@@ -110,8 +109,7 @@ def _multiprocess_DTI_helper(D_obj, exam_id, dti_col, id_col, pipeline, kwargs):
             dti_col, id_col=id_col, return_metadata=True
             )
         )
-    tensorfit = dpdti.run_pipeline(pipeline=pipeline, kwargs=kwargs)
-    return tensorfit
+    dpdti.run_pipeline(pipeline=pipeline, kwargs=kwargs)
 
 class DiPyPathHandler:
     """
