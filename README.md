@@ -5,5 +5,4 @@ Currently supports:
  2. Providing an object-oriented iterface for handling the loaded data.
  3. Running a DTI processing pipeline on the loaded dataset.
 
-My interests are in preclinical MRI (using Bruker scanner), phase-contrast MRI,
-DCE MRI, image processing.
+My interests are in preclinical MRI (using Bruker scanner), phase-contrast MRI, DCE MRI, image processing.

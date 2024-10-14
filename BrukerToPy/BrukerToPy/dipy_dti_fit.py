@@ -4,7 +4,7 @@ import pprint
 import traceback
 import numpy as np
 import nibabel as nib
-import bruker_to_py as btp
+from typing import Any
 from pathlib import Path
 from collections import OrderedDict
 
@@ -25,8 +25,90 @@ if sys.version_info < (3, 10):
         "hints. If those are removed, the code should work with python 3.8+ "
         "(untested)."
         )
+#make bruker_to_py optional
+btp: Any = None
+try:
+    import bruker_to_py as btp
+    init = btp.init
+except ImportError:
+    print("bruker_to_py not found, some functions may not work.")
+#make mpire optional
+WorkerPool: Any = None
+try:
+    from mpire import WorkerPool
+except ImportError:
+    print("mpire not found, multiprocessing pipeline will not work.")
 
-init = btp.init
+def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
+                     pipeline=["motion_correction", "denoise", "fit_dti"],
+                     kwargs: dict = {}, n_jobs: int = 2) -> None:
+    """Use multiple CPU cores to process multiple DTI datasets in parallel.
+
+    Parameters
+    ----------
+    path : str
+        Path to the directory containing the Bruker data.
+    dti_col : str
+        The column in the rat overview sheet to check for the scan id.
+    id_col : str, optional
+        The column in the rat overview sheet to check for the exam id,
+        by default "Study ID"
+    pipeline : list, optional
+        The processing steps to run, 
+        by default ["motion_correction", "denoise", "fit_dti"]
+    kwargs : dict, optional
+        kwargs are passed into the individual processing steps. kwargs
+        should be a dictionary with keys corresponding to the steps in the
+        pipeline and values should be dictionaries of additional arguments
+        to pass into each step, by default {}
+    n_jobs : int, optional
+        Number of CPU cores to use, by default 2
+
+    Returns
+    -------
+    list[dti.TensorFit]
+        List of the tensor fits for each dataset.
+
+    Raises
+    ------
+    ImportError
+        If bruker_to_py is not found.
+    ValueError
+        If degibbs is in the pipeline and num_processes is not 1.
+    
+    Examples
+    --------
+    >>> from dipy_dti_fit import multiprocess_DTI
+    >>> path = str(Path.cwd().parent / 'MRI_data')
+    >>> multiprocess_DTI(
+        path,
+        dti_col = 'dti',
+        id_col = 'MR #',
+        n_jobs = 3
+    )
+    """
+    if btp is None:
+        raise ImportError("bruker_to_py not found.")
+    if kwargs.get('degibbs', {}).get('num_processes', 1) != 1:
+        raise ValueError("No additional processes allowed for degibbs.")
+    D_obj = init(path, msg=False)
+    with WorkerPool(n_jobs) as pool:
+        results = pool.map(
+            _multiprocess_DTI_helper, 
+            [(D_obj, exam_id, dti_col, id_col, pipeline, kwargs) 
+             for exam_id in D_obj.avail_exam_ids[3:]]
+            )
+    return results
+
+def _multiprocess_DTI_helper(D_obj, exam_id, dti_col, id_col, pipeline, kwargs):
+    path_handler = DiPyPathHandler(D_obj, exam_id)
+    dpdti = DiPyDTI(
+        path_handler.get_data_paths(
+            dti_col, id_col=id_col, return_metadata=True
+            )
+        )
+    tensorfit = dpdti.run_pipeline(pipeline=pipeline, kwargs=kwargs)
+    return tensorfit
 
 class DiPyPathHandler:
     """
@@ -70,8 +152,10 @@ class DiPyPathHandler:
         Retrieve the paths to the data, bvals, bvecs, and mask for a given scan 
         id.
     """
-    def __init__(self, D_obj: btp.DataObject|str, exam_id: int|str, 
+    def __init__(self, D_obj: Any|str, exam_id: int|str, 
                  reco_id: int = 1, msg: bool = False) -> None:
+        if btp is None:
+            raise ImportError("bruker_to_py not found.")
         if isinstance(D_obj, str):
             if not Path(D_obj).exists():
                 raise FileNotFoundError(f'{D_obj} does not exist.')

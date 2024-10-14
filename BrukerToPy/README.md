@@ -15,9 +15,7 @@ cwd = Path.cwd()
 D_obj = btp.init(str(cwd))
 ```
 
-Main issues that may be encountered using these scripts would probably have to
-do with paths. Let me know if you encounter issues and I can try and fix them:
-martin.kozar@manchester.ac.uk
+Main issues that may be encountered using these scripts would probably have to do with paths. Let me know if you encounter issues by making a new issue and I can fix them.
 
 Allows to do DTI processing of bruker data using DiPy package:
 ```py
@@ -32,6 +30,8 @@ for exam_id in D_obj.avail_exam_ids:
         kwargs = {'degibbs':{'num_processes':3}}
         )
 ```
+
+## References
 
 load_bruker.py uses BrkRaw:
 
