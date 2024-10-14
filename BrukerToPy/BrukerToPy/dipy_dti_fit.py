@@ -26,9 +26,19 @@ if sys.version_info < (3, 10):
         "(untested)."
         )
 
+init = btp.init
+
 class DiPyPathHandler:
     """
     Class to handle paths for DiPy processing.
+    Definitions of ID numbers (following brkraw naming convention):
+        - Exam ID: The MR number, number of a new exam card in paravision, 
+        e.g. 230215.
+        - Scan ID: The number of the scan, e.g. 10, shown in paravision as E10 
+        on the exam card.
+        - Reco ID: The reconstruction number, e.g. 1. The default image is 1, 
+        any additional processing, such as returning phase images, will have
+        a different reco id. Diffusion images are usually reco id 1.
     
     Parameters
     ----------
@@ -38,7 +48,7 @@ class DiPyPathHandler:
         The exam id (MR number), e.g. 230215.
     reco_id : int, optional
         The reco id of the diffusion scans, e.g. 1.
-    tree : bool, optional
+    msg : bool, optional
         Whether to show the folder structure of the data, by default False.
     
     Attributes
@@ -61,11 +71,11 @@ class DiPyPathHandler:
         id.
     """
     def __init__(self, D_obj: btp.DataObject|str, exam_id: int|str, 
-                 reco_id: int = 1, tree: bool = False) -> None:
+                 reco_id: int = 1, msg: bool = False) -> None:
         if isinstance(D_obj, str):
             if not Path(D_obj).exists():
                 raise FileNotFoundError(f'{D_obj} does not exist.')
-            D_obj = btp.init(D_obj, msg=tree)
+            D_obj = btp.init(D_obj, msg=msg)
         self.D = D_obj
         self.exam_id = int(exam_id)
         self.reco_id = reco_id
@@ -169,6 +179,8 @@ class DiPyDTI():
     
     Example usage:
     --------------
+    from dipy_dti_fit import DiPyDTI, DiPyPathHandler, init
+    
     # Load the data (using DiPyPathHandler)
     paths_dict = DiPyPathHandler(D_obj, exam_id).get_data_paths(
         dti_col, id_col=id_col, return_metadata=True
@@ -196,6 +208,17 @@ class DiPyDTI():
     # Run the pipeline (all steps are saved by default, the folder that holds
     # the saved data is determined by .savedir attribute of the DiPyDTI object)
     dti.run_pipeline(pipeline=['motion_correction', 'denoise', 'fit_dti'])
+    
+    # Full example on multiple datasets using the bruker_to_py.py module
+    path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to MRI_data
+    D_obj = init(path, msg=False)
+    for exam_id in D_obj.avail_exam_ids:
+        path_handler = DiPyPathHandler(D_obj, exam_id)
+        dpdti = DiPyDTI(path_handler.get_data_paths('dti', return_metadata=True))
+        dpdti.run_pipeline(
+            pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
+            kwargs = {'degibbs':{'num_processes':3}}
+            )
     
     Explanation of the main methods:
     -------------------------------
@@ -433,12 +456,12 @@ class DiPyDTI():
     
     def __str__(self) -> str:
         return f"""Paths:
-        -----
-        Data: {self.data_path}
-        Bvals: {self.bvals_path}
-        Bvecs: {self.bvecs_path}
-        Mask: {self.mask_path}
-        Savedir: {self.savedir}"""
+-----
+Data: {self.data_path}
+Bvals: {self.bvals_path}
+Bvecs: {self.bvecs_path}
+Mask: {self.mask_path}
+Savedir: {self.savedir}"""
     
     def __repr__(self) -> str:
         paths_dict = DiPyDTI.make_paths_dict(
