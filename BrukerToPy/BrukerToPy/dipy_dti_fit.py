@@ -96,7 +96,7 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
         results = pool.map(
             _multiprocess_DTI_helper, 
             [(D_obj, exam_id, dti_col, id_col, pipeline, kwargs) 
-             for exam_id in D_obj.avail_exam_ids[3:]]
+             for exam_id in D_obj.avail_exam_ids]
             )
     return results
 
