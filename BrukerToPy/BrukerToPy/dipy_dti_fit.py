@@ -43,6 +43,7 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
                      pipeline=["motion_correction", "denoise", "fit_dti"],
                      kwargs: dict = {}, n_jobs: int = 2) -> None:
     """Use multiple CPU cores to process multiple DTI datasets in parallel.
+    Requires bruker_to_py and mpire to be installed.
 
     Parameters
     ----------
