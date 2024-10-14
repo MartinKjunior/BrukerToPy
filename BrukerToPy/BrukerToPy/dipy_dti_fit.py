@@ -1,6 +1,7 @@
 import sys
 import time
 import pprint
+import traceback
 import numpy as np
 import nibabel as nib
 import bruker_to_py as btp
@@ -100,7 +101,7 @@ class DiPyPathHandler:
             self.D.rat_overview[id_col] == exam_id, data_col
             ].astype(int).values[0]
     
-    def get_data_paths(self, dti_col: str, scan_id: int = None, 
+    def get_data_paths(self, dti_col: str = None, scan_id: int = None, 
                        id_col: str = "Study ID", return_metadata = False
                        ) -> dict:
         """Retrieve the paths to the data, bvals, bvecs, and mask for a given 
@@ -125,6 +126,8 @@ class DiPyPathHandler:
         dict[str, str]
             A dictionary with the paths to the data, bvals, bvecs, and mask.
         """
+        if dti_col is None and scan_id is None:
+            raise ValueError('Please provide either dti_col or scan_id.')
         if scan_id is None:
             scan_id = self.find_scan_id(dti_col, id_col)
         data_paths = {}
@@ -159,8 +162,10 @@ class DiPyPathHandler:
 class DiPyDTI():
     """Class to handle diffusion tensor imaging (DTI) processing with DiPy.
     User should mainly interact with the load_data and run_pipeline methods. 
-    5D data (x,y,z,diffusion,repetition) is reshaped to 4D for for motion 
-    correction and repetitions are averaged before the other steps.
+    5D data (x,y,z,diffusion,repetition) is reshaped to 4D for motion 
+    correction and repetitions are averaged before the other steps. bvals and 
+    bvecs are automatically prepared for multiple repetitions by repeating them 
+    num_reps times.
     
     Example usage:
     --------------
@@ -178,6 +183,9 @@ class DiPyDTI():
     paths_dict = DiPyDTI.make_paths_dict(data_path, bvals_path, bvecs_path, 
         mask_path, savedir)
     dti = DiPyDTI(paths_dict)
+
+    # Loading the data allows for additional kwargs to be passed in
+    dti = DiPyDTI(paths_dict, exam_id=230215, scan_id=10, check_data=False)
     
     # Set the save directory (if not provided in the paths_dict)
     dti.set_savedir(savedir)
@@ -204,6 +212,20 @@ class DiPyDTI():
         - If you have the paths, you can use the DiPyDTI.make_paths_dict method 
         to create the dictionary of paths.
     
+    Loading data for running individual methods manually:
+        - Replace the data_path in the paths_dict with the path to the saved
+        data from the previous step and you can run the individual methods.
+        - If you've run some of the processing steps and your repetitions were 
+        averaged out, you need to be careful since loading the methods file will
+        give you the original number of repetitions. You can set the num_reps
+        attribute manually to the number of repetitions you have.
+        - The checking of the loaded data can be turned off by setting 
+        check_data=False in the load_data method.
+        - bvals and bvecs repetitions can be turned off by setting 
+        prepare_b0s=False in the load_data method.
+        - exam_id and scan_id can be set manually as kwargs to either the 
+        load_data method or the DiPyDTI object.
+    
     Saving data:
         - Steps in the pipeline are saved by default, but you can also save
         individual data arrays using the save method. A DiPyDTI folder is 
@@ -227,7 +249,13 @@ class DiPyDTI():
     Default pipeline changes to DiPy default values:
         - The motion_correction step uses the default pipeline of 
         ['center_of_mass', 'translation', 'rigid'] (no 'affine').
+        - The degibbs step uses the deault n_points of 2.
         - The denoise step uses the default method of 'mppca'.
+        - The median_otsu function used in extract_brain uses the default
+        parameters of median_radius=2, numpass=1.
+        - The fit_dti step uses the default model of 'WLS'.
+        - The estimate_noise function used in RESTORE model uses the default 
+        estimator piesno.
         
     Attributes:
     -----------
@@ -331,7 +359,8 @@ class DiPyDTI():
         
     degibbs(nifti: nib.Nifti1Image, slice_axis = 2, save: bool = True, **kwargs)
         Remove Gibbs ringing artifacts from the diffusion data. Option to use
-        multiple cores by specifying num_processes=.
+        multiple cores by specifying num_processes=. Warning: do not set the 
+        inplace= argument to True.
         
     denoise(nifti: nib.Nifti1Image, method: str = 'mppca', save: bool = True,
             **kwargs) -> nib.Nifti1Image
@@ -363,7 +392,7 @@ class DiPyDTI():
                     mask_path: str, savedir: str) -> dict
         Create a dictionary of paths for the DiPyDTI object.
     """
-    def __init__(self, paths_dict: dict = None) -> None:
+    def __init__(self, paths_dict: dict = None, **kwargs) -> None:
         # Paths
         self.data_path: Path = ""
         self.bvals_path: Path = ""
@@ -400,7 +429,7 @@ class DiPyDTI():
         self.model: dti.TensorModel = None
         self.dti_fit: dti.TensorFit = None
         if paths_dict is not None:
-            self.load_data(**paths_dict)
+            self.load_data(**paths_dict, **kwargs)
     
     def __str__(self) -> str:
         return f"""Paths:
@@ -419,7 +448,8 @@ class DiPyDTI():
         return f"DiPyDTI(paths_dict={paths_dict})"
     
     def load_data(self, data_path: str, bvals_path: str, bvecs_path: str, 
-                  mask_path: str = "", num_reps: int = 1, **kwargs):
+                  mask_path: str = "", num_reps: int = 0, 
+                  prepare_b0s: bool = True, check_data: bool = True, **kwargs):
         """Load the data, bvals, bvecs, and mask (if provided) into the DiPyDTI 
         object. Optionally set the savedir, method, acqp, and visu_pars. If 
         method file is provided, the number of repetitions will be extracted 
@@ -441,9 +471,33 @@ class DiPyDTI():
         method, acqp, visu_pars : OrderedDict, optional
             The method, acqp, and visu_pars dictionaries from the bruker data,
             by default None.
+        num_reps : int, optional
+            Number of repetitions in the diffusion data, by default 1.
+        prepare_b0s : bool, optional
+            Whether to prepare the bvals and bvecs by repeating them num_reps 
+            times (need as many values as there are diffusion volumes), by 
+            default True.
+        check_data : bool, optional
+            Whether to check the loaded data, by default True.
+            
+        Raises
+        ------
+        ValueError
+            If diffusion data is not a nifti image.
+            If diffusion data is not 4D or 5D.
+            If bvals is not a 1D numpy array.
+            If bvals length does not match the number of diffusion volumes.
+            If bvecs is not a 2D numpy array.
+            If bvecs shape does not match the number of diffusion volumes.
+            If bvecs does not have 3 columns.
+            If mask is not a 3D numpy array.
+            If mask shape does not match the diffusion data.
+        
         """
         self.data_path = Path(data_path)
-        self.get_scan_ids(self.data_path)
+        self.get_scan_ids(
+            self.data_path, kwargs.get('exam_id'), kwargs.get('scan_id')
+            )
         self.bvals_path = Path(bvals_path)
         self.bvecs_path = Path(bvecs_path)
         self.mask_path = Path(mask_path)
@@ -456,14 +510,12 @@ class DiPyDTI():
             self.method = kwargs.get('method')
             self.acqp = kwargs.get('acqp')
             self.visu_pars = kwargs.get('visu_pars')
-        if self.method is not None:
-            self.num_reps = self.method['PVM_NRepetitions']
-        else:
-            self.num_reps = num_reps
-        if self.num_reps != 1:
+        self._set_num_reps(num_reps)
+        if self.num_reps != 1 and prepare_b0s:
             self.bvals = np.tile(self.bvals, self.num_reps)
             self.bvecs = np.tile(self.bvecs, (self.num_reps, 1))
-        self._check_loaded_data()
+        if check_data:
+            self._check_loaded_data()
     
     def run_pipeline(
         self, 
@@ -534,6 +586,7 @@ class DiPyDTI():
                                      "pipeline.")
                 self._log_step(step)
         except Exception as e:
+            print(traceback.format_exc())
             self._log_step(step, error=e)
     
     def make_gradient_table(self, atol: float = 1.0, **kwargs) -> GradientTable:
@@ -553,8 +606,13 @@ class DiPyDTI():
             print(f"{savedir} is not a valid path")
             print(e)
     
-    def get_scan_ids(self, data_path: Path) -> tuple[int, int]:
+    def get_scan_ids(self, data_path: Path, exam_id: int = None, 
+                     scan_id: int = None) -> tuple[int, int]:
         "Extract the exam and scan IDs from the data path."
+        if exam_id is not None and scan_id is not None:
+            self.exam_id = exam_id
+            self.scan_id = scan_id
+            return self.exam_id, self.scan_id
         try:
             self.exam_id = int(data_path.parts[-5].split('_')[2])
             self.scan_id = int(data_path.parts[-4])
@@ -631,7 +689,7 @@ class DiPyDTI():
         return self.sigma, self.noise_mask
     
     def degibbs(self, nifti: nib.Nifti1Image, slice_axis = 2, save: bool = True, 
-                **kwargs) -> nib.Nifti1Image:
+                n_points: int = 2, **kwargs) -> nib.Nifti1Image:
         """Remove Gibbs ringing artifacts from the diffusion data. Option to use
         multiple cores by specifying num_processes=.
 
@@ -644,11 +702,14 @@ class DiPyDTI():
         save : bool, optional
             Whether to save the resulting nifti file, by default True
         """
+        if kwargs.get('inplace', False) is True:
+            raise ValueError("Do not set inplace=True in degibbs.")
         self.gibbs_suppressed = self.to_nifti(
             nifti, 
             gibbs_removal(
                 nifti.get_fdata(), 
                 slice_axis=slice_axis, 
+                n_points=n_points,
                 inplace=False,
                 **kwargs
                 )
@@ -737,7 +798,9 @@ class DiPyDTI():
         self.model = self._prepare_model(which=model, nifti=nifti, **kwargs)
         self.dti_fit = self.model.fit(masked_data)
         if save:
-            self.save(self.dti_fit, newdir='DTIFit', filename='dti_fit')
+            self.save(
+                self.dti_fit, newdir='DTIFit', filename='dti_fit', nifti=nifti
+                )
         return self.dti_fit
     
     def mask_data(self, nifti: nib.Nifti1Image) -> np.ndarray:
@@ -748,12 +811,13 @@ class DiPyDTI():
             # Numpy vectorization works in numpy-native axis order (dzyx)
             #if you do (xyz) * (xyzd) it gives an error that it can't broadcast
             #the shapes, so we swap the axes around, multiply and swap back
-            return (nifti.get_fdata().T * self.mask.get_fdata().T).T
+            return (nifti.get_fdata().T * self.mask.T).T
         else:
             return nifti.get_fdata()
     
     def save(self, data: nib.Nifti1Image|np.ndarray|dti.TensorFit, 
-             newdir: str = "", filename: str = ""):
+             newdir: str = "", filename: str = "", 
+             nifti: nib.Nifti1Image = None):
         """Save the data to the savedir directory. If newdir is provided, a new
         subdirectory will be created in the savedir directory. The filename of 
         the saved data will be {exam_id}_{scan_id}_{filename}.
@@ -766,6 +830,9 @@ class DiPyDTI():
             The name of the new subdirectory to save the data in, by default ""
         filename : str, optional
             The filename to save the data as, by default ""
+        nifti : nib.Nifti1Image, optional
+            A nifti object for retrieving affine and header info for saving fa 
+            and md maps, by default None
 
         Raises
         ------
@@ -781,10 +848,16 @@ class DiPyDTI():
         elif isinstance(data, np.ndarray):
             np.save(new_savedir / f'{prefix}_{filename}.npy', data)
         elif isinstance(data, dti.TensorFit):
+            if nifti is None:
+                raise ValueError("Nifti object required for saving dti fit.")
             nib.save(
-                data.fa, 
-                new_savedir / f'{prefix}_fractional_anisotropy.nii.gz')
-            nib.save(data.md, new_savedir / f'{prefix}_mean_diffusivity.nii.gz')
+                self.to_nifti(nifti, data.fa),
+                new_savedir / f'{prefix}_fractional_anisotropy.nii.gz'
+                )
+            nib.save(
+                self.to_nifti(nifti, data.md),
+                new_savedir / f'{prefix}_mean_diffusivity.nii.gz'
+                )
             np.save(new_savedir / f'{prefix}_{filename}.npy', data)
         else:
             raise ValueError(f"Data type {type(data)} not recognized for "
@@ -807,6 +880,17 @@ class DiPyDTI():
     def to_nifti(nifti, array) -> nib.Nifti1Image:
         "Convert an array to a Nifti1Image."
         return nib.Nifti1Image(array, nifti.affine, nifti.header)
+    
+    def _set_num_reps(self, num_reps: int):
+        "Set the number of repetitions."
+        if not isinstance(num_reps, int):
+            raise ValueError("Number of repetitions should be an integer.")
+        if num_reps != 0:
+            self.num_reps = num_reps
+        elif self.method is not None:
+            self.num_reps = self.method['PVM_NRepetitions']
+        elif self.num_reps == 0:
+            self.num_reps = 1
     
     def _check_loaded_data(self):
         "Check if the loaded data is valid."
@@ -897,6 +981,7 @@ If a step was successful, it will be logged here:"""
         *********
         *Denoise*
         *********"""
+        step = step.replace('_', ' ').replace(' dti', ' DTI')
         print(f"{'*' * (len(step) + 2)}")
         print(f"*{step.capitalize()}*")
         print(f"{'*' * (len(step) + 2)}")
