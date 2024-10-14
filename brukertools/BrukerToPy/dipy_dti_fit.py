@@ -315,7 +315,9 @@ class DiPyDTI():
     for exam_id in D_obj.avail_exam_ids:
         path_handler = DiPyPathHandler(D_obj, exam_id)
         dpdti = DiPyDTI(
-            path_handler.get_data_paths('dti', return_metadata=True)
+            path_handler.get_data_paths(
+                'dti', id_col='MR #', return_metadata=True
+                )
             )
         dpdti.run_pipeline(
             pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
@@ -684,6 +686,7 @@ Savedir: {self.savedir}"""
         try:
             for step in pipeline:
                 self._print_step(step)
+                start = time.perf_counter()
                 if step == "motion_correction":
                     correct_motion_kwargs = kwargs.get('motion_correction', {})
                     current_data, _ = self.correct_motion(
@@ -712,7 +715,7 @@ Savedir: {self.savedir}"""
                 else:
                     raise ValueError(f"Step {step} not recognized in the "
                                      "pipeline.")
-                self._log_step(step)
+                self._log_step(step, time=time.perf_counter()-start)
         except Exception as e:
             print(traceback.format_exc())
             self._log_step(step, error=e)
@@ -1071,7 +1074,7 @@ Savedir: {self.savedir}"""
                 raise ValueError(f"Step {step} not recognized in the pipeline.")
         if "extract_brain" in pipeline and self.mask is not None:
             raise ValueError("Cannot extract brain if a mask is provided.")
-        # Check if every kwargs step exists in pipeline and if each value is dict
+        # See if every kwargs step exists in pipeline and if each value is dict
         for step, value in kwargs.items():
             if step not in pipeline:
                 raise ValueError(
@@ -1087,7 +1090,7 @@ Savedir: {self.savedir}"""
         "Log the pipeline parameters to a text file."
         file_timestr = time.strftime("%Y%m%d-%H%M%S")
         timestr = time.strftime("%Y-%m-%d %H:%M:%S")
-        log_msg = f"""{timestr} - Ran the DiPyDTI pipeline on the following data:
+        log_msg = f"""{timestr} - Ran DiPyDTI pipeline on the following data:
 
 {str(self)}
 
@@ -1114,12 +1117,13 @@ If a step was successful, it will be logged here:"""
         print(f"*{step.capitalize()}*")
         print(f"{'*' * (len(step) + 2)}")
     
-    def _log_step(self, step: str = None, error: Exception = None):
+    def _log_step(self, step: str = None, error: Exception = None, 
+                  time: float = None):
         "Append the step to the log file."
         step = step.capitalize()
         with open(self.logfile, 'a') as f:
             if error is None:
-                f.write(f"\n{step} ran succesfully.")
+                f.write(f"\n{step} ran succesfully in {time:.2f} seconds.")
             else:
                 f.write(f"\n{step} failed with the following error: {error}")
                 f.write("\nExiting the pipeline.")

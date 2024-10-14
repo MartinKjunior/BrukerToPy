@@ -54,7 +54,9 @@ path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to
 D_obj = init(path, msg=False)
 for exam_id in D_obj.avail_exam_ids:
     path_handler = DiPyPathHandler(D_obj, exam_id)
-    dpdti = DiPyDTI(path_handler.get_data_paths('dti', return_metadata=True))
+    dpdti = DiPyDTI(
+        path_handler.get_data_paths('dti', id_col='MR #', return_metadata=True)
+        )
     dpdti.run_pipeline(
         pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
         kwargs = {'degibbs':{'num_processes':3}}
