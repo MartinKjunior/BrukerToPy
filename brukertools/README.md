@@ -4,7 +4,7 @@ Functions used to process data from a pre-clinical Bruker MRI scanner using
 ParaVision 6.0.1. The main idea is to turn the raw scanner data into python 
 format (nifti files for data and ordered dictionaries for acqp, method and 
 visu_pars files). Firstly run load_bruker.py through command prompt/terminal 
-(instructions inside), then use bruker_to_py.py to (easily) access the data.
+(instructions inside), then use bruker_to_py.py to (easily) access the data. ***Warning:*** `load_bruker.py` was only tested with python=3.7 and bruker=0.3.7. `dipy_dti_fit.py` requires at least python=3.10.
 
 The data is loaded using the CLI script `load_bruker.py`:
 ```py
@@ -53,11 +53,11 @@ for exam_id in D_obj.avail_exam_ids:
 
 ## References
 
-`load_bruker.py` uses BrkRaw:
+`load_bruker.py` uses [BrkRaw](https://github.com/BrkRaw/brkraw):
 
 Lee, Sung-Ho, Ban, Woomi, & Shih, Yen-Yu Ian. (2020, June 4). BrkRaw/bruker: BrkRaw v0.3.3 (Version 0.3.3). Zenodo. http://doi.org/10.5281/zenodo.3877179
 
-`dipy_dti_fit.py` uses DiPy:
+`dipy_dti_fit.py` uses [DiPy](https://github.com/dipy/dipy):
 
 Garyfallidis E, Brett M, Amirbekian B, Rokem A, van der Walt S, Descoteaux M, Nimmo-Smith I and Dipy Contributors (2014). DIPY, a library for the analysis of diffusion MRI data. Frontiers in Neuroinformatics, vol.8, no.8. 
 https://doi.org/10.3389/fninf.2014.00008
