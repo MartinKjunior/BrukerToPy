@@ -166,6 +166,7 @@ class DiPyPathHandler:
             D_obj = btp.init(D_obj, msg=msg, animal_overview=animal_overview)
         self.D = D_obj
         self.exam_id = int(exam_id)
+        self.scan_id = None
         self.reco_id = reco_id
     
     def find_scan_id(self, data_col: str, id_col: str = "Study ID", 
@@ -203,7 +204,9 @@ class DiPyPathHandler:
                        id_col: str = "Study ID", return_metadata = False
                        ) -> dict:
         """Retrieve the paths to the data, bvals, bvecs, and mask for a given 
-        scan id.
+        scan id. Mask is assumed to exist within a folder called BrainMask 
+        within the savedir directory (e.g. 
+        "../Processed_MRI_data/20230505_094718_230215_1_1/BrainMask}).
 
         Parameters
         ----------
