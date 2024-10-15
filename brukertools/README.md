@@ -33,6 +33,29 @@ Diffusion processing requires knowing the diffusion gradient strengths used to g
 showing the animal's exam_id and scan_id to identify the DTI datasets. This is 
 the third input for `btp.init()`, or second input to `btp.DataObject()`.
 
+**Usual folder structure:**
+
+```
+Study_PRIME000/
+├── animal_overview.xlsx
+├── Processed_MRI_data/
+│   └── 20230426_102559_230178_1_1/
+│       ├── DiPyDTI/
+│       └── BrainMask/
+├── MRI_data/
+│   ├── 20230426_102559_230178_1_1/
+│   └── 20230426_102559_230178_1_1_loaded/
+└── Scripts/
+    ├── bruker_to_py.py
+    ├── dipy_dti_fit.py
+    └── main.ipynb
+```
+Additional subfolders can be added to each exam in `Processed_MRI_data` using 
+```py
+D_obj = bruker_to_py.init('<path to /MRI_data>')
+D_obj.prepare_savedirs('BrainMask')
+```
+
 **Example using paths to files:**
 ```py
 # DiPyDTI can be instantiated using paths to the necessary files
