@@ -471,9 +471,9 @@ class DataObject:
         else:
             overview_path = os.path.join(os.path.dirname(self.path), filename)
         try:
-            if os.path.suffix(overview_path) == '.csv':
+            if os.path.splitext(overview_path)[1] == '.csv':
                 return pd.read_csv(overview_path)
-            elif os.path.suffix(overview_path) == '.xlsx':
+            elif os.path.splitext(overview_path)[1] == '.xlsx':
                 return pd.read_excel(overview_path)
             else:
                 raise ValueError('Unsupported file type. Please use .csv or .xlsx.')

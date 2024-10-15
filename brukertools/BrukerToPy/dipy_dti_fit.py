@@ -50,9 +50,9 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
     path : str
         Path to the directory containing the Bruker data.
     dti_col : str
-        The column in the rat overview sheet to check for the scan id.
+        The column in the animal overview sheet to check for the scan id.
     id_col : str, optional
-        The column in the rat overview sheet to check for the exam id,
+        The column in the animal overview sheet to check for the exam id,
         by default "Study ID"
     pipeline : list, optional
         The processing steps to run, 
@@ -155,7 +155,7 @@ class DiPyPathHandler:
     """
     def __init__(self, D_obj: Any|str, exam_id: int|str, 
                  reco_id: int = 1, msg: bool = False, 
-                 animal_overview: str = "Rat_Overview.xlsx") -> None:
+                 animal_overview: str = "animal_overview.xlsx") -> None:
         if btp is None:
             raise ImportError("bruker_to_py not found.")
         if isinstance(D_obj, str):
@@ -171,7 +171,7 @@ class DiPyPathHandler:
                      exam_id = None) -> int:
         '''
         Find the scan id for a given exam id based on a column in the 
-        rat_overview sheet.
+        animal_overview sheet.
         
         Parameters
         ----------
@@ -192,10 +192,10 @@ class DiPyPathHandler:
             if self.exam_id is None:
                 raise ValueError('No exam id set.')
             exam_id = self.exam_id
-        if self.D.rat_overview is None:
-            raise ValueError('No rat overview sheet found.')
-        return self.D.rat_overview.loc[
-            self.D.rat_overview[id_col] == exam_id, data_col
+        if self.D.animal_overview is None:
+            raise ValueError('No animal overview sheet found.')
+        return self.D.animal_overview.loc[
+            self.D.animal_overview[id_col] == exam_id, data_col
             ].astype(int).values[0]
     
     def get_data_paths(self, dti_col: str = None, scan_id: int = None, 
@@ -209,12 +209,12 @@ class DiPyPathHandler:
         Parameters
         ----------
         dti_col : str
-            The column in self.D.rat_overview to check for the scan id.
+            The column in self.D.animal_overview to check for the scan id.
         scan_id : int, optional
             The scan id. If None, the scan id will be found based on the exam 
             id, by default None
         id_col : str, optional
-            The column in self.D.rat_overview to check for the exam id, 
+            The column in self.D.animal_overview to check for the exam id, 
             by default "Study ID"
         return_metadata : bool, optional
             Whether to add the methods, acqp, and visu_pars to the output 
