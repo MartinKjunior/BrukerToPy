@@ -678,7 +678,8 @@ Savedir: {self.savedir}"""
         """
         self._check_pipeline_inputs(pipeline, kwargs)
         self.pipeline_steps = pipeline.copy()
-        self._log_pipeline(pipeline, kwargs)
+        timestr = self._log_pipeline(pipeline, kwargs)
+        self.savedir = self.savedir / f"{timestr}"
         current_data = self.diffusion_data
         try:
             for step in pipeline:
@@ -1102,6 +1103,7 @@ If a step was successful, it will be logged here:"""
             f.write(log_msg)
         print(f"Logging the pipeline to {self.logfile}")
         print(log_msg)
+        return timestr
     
     def _print_step(self, step: str):
         """Print the step to the console surrounded by *'s, example:
