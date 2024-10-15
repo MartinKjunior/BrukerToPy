@@ -906,7 +906,7 @@ Savedir: {self.savedir}"""
                 newdir='BrainExtracted', 
                 filename='b0_masked'
                 )
-            self.save(self.mask, newdir='BrainExtracted', filename='mask')
+            self.save(self.mask, newdir='BrainMask', filename='brain_mask')
         return self.b0_masked, self.mask
     
     def extract_b0vol(self, nifti: nib.Nifti1Image, b0_threshold: int = 50

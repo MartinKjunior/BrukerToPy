@@ -44,12 +44,13 @@ Study_PRIME000/
 │       └── BrainMask/
 ├── MRI_data/
 │   ├── 20230426_102559_230178_1_1/
-│   └── 20230426_102559_230178_1_1_loaded/
+│   └── 20230426_102559_230178_1_1_loaded/  <- from load_bruker.py
 └── Scripts/
     ├── bruker_to_py.py
     ├── dipy_dti_fit.py
     └── main.ipynb
 ```
+
 Additional subfolders can be added to each exam in `Processed_MRI_data` using 
 ```py
 D_obj = bruker_to_py.init('<path to /MRI_data>')
