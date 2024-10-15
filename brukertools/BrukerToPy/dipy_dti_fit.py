@@ -8,7 +8,6 @@ from typing import Any
 from pathlib import Path
 from collections import OrderedDict
 
-import dipy.reconst.dti as dti
 from dipy.align import motion_correction
 from dipy.core.gradients import gradient_table, GradientTable
 from dipy.io.image import load_nifti
@@ -18,6 +17,7 @@ from dipy.denoise.patch2self import patch2self
 from dipy.denoise.localpca import mppca
 from dipy.denoise.gibbs import gibbs_removal
 from dipy.segment.mask import median_otsu
+from dipy.reconst.dti import TensorModel, TensorFit
 
 if sys.version_info < (3, 10):
     raise ImportError(
@@ -67,7 +67,7 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
 
     Returns
     -------
-    list[dti.TensorFit]
+    list[TensorFit]
         List of the tensor fits for each dataset.
 
     Raises
@@ -374,7 +374,6 @@ class DiPyDTI():
     Default pipeline changes to DiPy default values (and original defaults):
         - The motion_correction step uses the pipeline of 
         ['center_of_mass', 'translation', 'rigid'] (no 'affine').
-        - The degibbs step uses the default n_points of 2 (3).
         - The median_otsu function used in extract_brain uses the default
         parameters of median_radius=2, numpass=1 (4, 4).
     
@@ -438,16 +437,16 @@ class DiPyDTI():
         The Gibbs suppressed data.
     denoised_data : nib.Nifti1Image
         The denoised data.
-    model : dti.TensorModel
+    model : TensorModel
         The tensor model.
-    dti_fit : dti.TensorFit
+    dti_fit : TensorFit
         The final DTI fit.
     
     Methods:
     --------
     run_pipeline(pipeline: list = ["motion_correction", "denoise", "fit_dti"],
                     kwargs: dict[dict] = {}, store_tensors: bool = False
-                    ) -> None|dti.TensorFit
+                    ) -> None|TensorFit
         Run a pipeline of processing steps. The default pipeline is in
         self.valid_steps (defined in __init__). After motion correction, the 
         data is averaged if there are multiple repetitions.
@@ -503,7 +502,7 @@ class DiPyDTI():
         Extract the b0 volume from the diffusion data.
         
     fit_dti(nifti: nib.Nifti1Image, save: bool = True, model: str = 'WLS',
-            **kwargs) -> dti.TensorFit
+            **kwargs) -> TensorFit
         Fit the diffusion tensor model to the data. Options: 'WLS', 'RESTORE'.
         kwargs are passed into estimate_noise for the RESTORE model.
     
@@ -553,8 +552,8 @@ class DiPyDTI():
         self.sigma: np.ndarray = None
         self.gibbs_suppressed: nib.Nifti1Image = None
         self.denoised_data: nib.Nifti1Image = None
-        self.model: dti.TensorModel = None
-        self.dti_fit: dti.TensorFit = None
+        self.model: TensorModel = None
+        self.dti_fit: TensorFit = None
         if paths_dict is not None:
             self.load_data(**paths_dict, **kwargs)
     
@@ -648,7 +647,7 @@ Savedir: {self.savedir}"""
     def run_pipeline(
         self, 
         pipeline: list = ["motion_correction", "denoise", "fit_dti"], 
-        kwargs: dict[dict] = {}) -> None|dti.TensorFit:
+        kwargs: dict[dict] = {}) -> None|TensorFit:
         """Run a pipeline of processing steps. The default pipeline is
         in self.valid_steps (defined in __init__). After motion correction,
         the data is averaged if there are multiple repetitions.
@@ -818,7 +817,7 @@ Savedir: {self.savedir}"""
         return self.sigma, self.noise_mask
     
     def degibbs(self, nifti: nib.Nifti1Image, slice_axis = 2, save: bool = True, 
-                n_points: int = 2, **kwargs) -> nib.Nifti1Image:
+                **kwargs) -> nib.Nifti1Image:
         """Remove Gibbs ringing artifacts from the diffusion data. Option to use
         multiple cores by specifying num_processes=.
 
@@ -838,7 +837,6 @@ Savedir: {self.savedir}"""
             gibbs_removal(
                 nifti.get_fdata(), 
                 slice_axis=slice_axis, 
-                n_points=n_points,
                 inplace=False,
                 **kwargs
                 )
@@ -918,7 +916,7 @@ Savedir: {self.savedir}"""
         return nifti.get_fdata()[..., b0_idx]
     
     def fit_dti(self, nifti: nib.Nifti1Image, save: bool = True, 
-                model: str = 'WLS', **kwargs) -> dti.TensorFit:
+                model: str = 'WLS', **kwargs) -> TensorFit:
         """Fit the diffusion tensor model to the data. Options: 'WLS', 
         'RESTORE'. kwargs are passed into estimate_noise for the RESTORE model.
         """
@@ -944,7 +942,7 @@ Savedir: {self.savedir}"""
         else:
             return nifti.get_fdata()
     
-    def save(self, data: nib.Nifti1Image|np.ndarray|dti.TensorFit, 
+    def save(self, data: nib.Nifti1Image|np.ndarray|TensorFit, 
              newdir: str = "", filename: str = "", 
              nifti: nib.Nifti1Image = None):
         """Save the data to the savedir directory. If newdir is provided, a new
@@ -953,7 +951,7 @@ Savedir: {self.savedir}"""
 
         Parameters
         ----------
-        data : nib.Nifti1Image | np.ndarray | dti.TensorFit
+        data : nib.Nifti1Image | np.ndarray | TensorFit
             The data to save.
         newdir : str, optional
             The name of the new subdirectory to save the data in, by default ""
@@ -976,7 +974,7 @@ Savedir: {self.savedir}"""
             nib.save(data, new_savedir / f'{prefix}_{filename}.nii.gz')
         elif isinstance(data, np.ndarray):
             np.save(new_savedir / f'{prefix}_{filename}.npy', data)
-        elif isinstance(data, dti.TensorFit):
+        elif isinstance(data, TensorFit):
             if nifti is None:
                 raise ValueError("Nifti object required for saving dti fit.")
             nib.save(
@@ -1159,13 +1157,13 @@ If a step was successful, it will be logged here:"""
             )
 
     def _prepare_model(self, which: str = 'WLS', nifti: nib.Nifti1Image = None,
-                       **kwargs) -> dti.TensorModel:
+                       **kwargs) -> TensorModel:
         "Prepare the tensor model for fitting."
         if which == 'WLS':
-            return dti.TensorModel(self.gtab, fit_method='WLS')
+            return TensorModel(self.gtab, fit_method='WLS')
         elif which == 'RESTORE':
             sigma, _ = self.estimate_noise(nifti, **kwargs)
-            return dti.TensorModel(self.gtab, fit_method='RESTORE', sigma=sigma)
+            return TensorModel(self.gtab, fit_method='RESTORE', sigma=sigma)
     
     def _check_gtab(self):
         "Check if the gradient table is available and create one if not"
