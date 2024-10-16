@@ -678,8 +678,7 @@ Savedir: {self.savedir}"""
         """
         self._check_pipeline_inputs(pipeline, kwargs)
         self.pipeline_steps = pipeline.copy()
-        timestr = self._log_pipeline(pipeline, kwargs)
-        self.savedir = self.savedir / f"{timestr}"
+        self._log_pipeline(pipeline, kwargs)
         current_data = self.diffusion_data
         try:
             for step in pipeline:
@@ -1086,6 +1085,7 @@ Savedir: {self.savedir}"""
     def _log_pipeline(self, pipeline: list, kwargs: dict):
         "Log the pipeline parameters to a text file."
         file_timestr = time.strftime("%Y%m%d-%H%M%S")
+        self.savedir = self.savedir / f"{file_timestr}"
         timestr = time.strftime("%Y-%m-%d %H:%M:%S")
         log_msg = f"""{timestr} - Ran DiPyDTI pipeline on the following data:
 
@@ -1103,7 +1103,6 @@ If a step was successful, it will be logged here:"""
             f.write(log_msg)
         print(f"Logging the pipeline to {self.logfile}")
         print(log_msg)
-        return file_timestr
     
     def _print_step(self, step: str):
         """Print the step to the console surrounded by *'s, example:
