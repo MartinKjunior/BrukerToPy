@@ -1086,6 +1086,7 @@ Savedir: {self.savedir}"""
         "Log the pipeline parameters to a text file."
         file_timestr = time.strftime("%Y%m%d-%H%M%S")
         self.savedir = self.savedir / f"{file_timestr}"
+        self.savedir.mkdir(exist_ok=True)
         timestr = time.strftime("%Y-%m-%d %H:%M:%S")
         log_msg = f"""{timestr} - Ran DiPyDTI pipeline on the following data:
 
