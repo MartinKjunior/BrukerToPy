@@ -1103,7 +1103,7 @@ If a step was successful, it will be logged here:"""
             f.write(log_msg)
         print(f"Logging the pipeline to {self.logfile}")
         print(log_msg)
-        return timestr
+        return file_timestr
     
     def _print_step(self, step: str):
         """Print the step to the console surrounded by *'s, example:
