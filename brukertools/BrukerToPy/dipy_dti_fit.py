@@ -773,7 +773,8 @@ Savedir: {self.savedir}"""
         To apply a registration affine from a previous motion correction, supply
         both reg_affine and static (image). reg_affine is the affine output of 
         motion_correct and static is the static image used in the registration. 
-        static can also be a tuple of (static_img.shape, static_img.affine).
+        static can also be a tuple of (static_img.shape, static_img.affine). 
+        static can also be the same as nifti if no rescaling is needed.
         """
         pipeline = pipeline or ["center_of_mass", "translation", "rigid"]
         self.__check_gtab()
@@ -1020,7 +1021,8 @@ Savedir: {self.savedir}"""
                      ) -> tuple[nib.Nifti1Image, np.ndarray]:
         """Apply an affine matrix to the moving image based on affine and the 
         static image. The static image is used to determine the shape and affine
-        and can be supplied as a nibabel image or a tuple of (shape, affine)."""
+        and can be supplied as a nibabel image or a tuple of (shape, affine). If 
+        static is not provided, the moving image shape and affine are used."""
         static = static or moving
         transformed = []
         moving_data = moving.get_fdata()
