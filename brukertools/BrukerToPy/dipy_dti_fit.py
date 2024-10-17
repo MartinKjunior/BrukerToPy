@@ -796,37 +796,6 @@ Savedir: {self.savedir}"""
                 )
         return self.motion_corrected, self.reg_affines
 
-    def apply_affine(self, moving: nib.Nifti1Image, affine: np.ndarray, 
-                     static: nib.Nifti1Image|tuple[tuple, np.ndarray] = None, 
-                     interpolation: str = 'nearest'
-                     ) -> tuple[nib.Nifti1Image, np.ndarray]:
-        """Apply an affine matrix to the moving image based on affine and the 
-        static image. The static image is used to determine the shape and affine
-        and can be supplied as a nibabel image or a tuple of (shape, affine)."""
-        static = static or moving
-        transformed = []
-        moving_data = moving.get_fdata()
-        moving_shape, moving_affine = moving.shape[:-1], moving.affine
-        if isinstance(static, nib.Nifti1Image):
-            static_shape, static_affine = static.shape[:-1], static.affine
-        else:
-            static_shape, static_affine = static
-        for i in range(moving.shape[-1]):
-            affine_map = AffineMap(
-                affine[..., i],
-                static_shape,
-                static_affine,
-                moving_shape,
-                moving_affine
-            )
-            transformed.append(
-                affine_map.transform(
-                    moving_data[..., i],
-                    interpolation=interpolation
-                )
-            )
-        return self.to_nifti(moving, np.stack(transformed, axis=3)), affine
-
     def average_repetitions(self, nifti: nib.Nifti1Image, num_reps: int = 1,
                             save: bool = True) -> nib.Nifti1Image:
         """Average the repetitions in the diffusion data. The number of 
@@ -1043,6 +1012,38 @@ Savedir: {self.savedir}"""
         else:
             raise ValueError(f"Data type {type(data)} not recognized for "
                              "saving.")
+
+    @staticmethod
+    def apply_affine(moving: nib.Nifti1Image, affine: np.ndarray, 
+                     static: nib.Nifti1Image|tuple[tuple, np.ndarray] = None, 
+                     interpolation: str = 'nearest'
+                     ) -> tuple[nib.Nifti1Image, np.ndarray]:
+        """Apply an affine matrix to the moving image based on affine and the 
+        static image. The static image is used to determine the shape and affine
+        and can be supplied as a nibabel image or a tuple of (shape, affine)."""
+        static = static or moving
+        transformed = []
+        moving_data = moving.get_fdata()
+        moving_shape, moving_affine = moving.shape[:-1], moving.affine
+        if isinstance(static, nib.Nifti1Image):
+            static_shape, static_affine = static.shape[:-1], static.affine
+        else:
+            static_shape, static_affine = static
+        for i in range(moving.shape[-1]):
+            affine_map = AffineMap(
+                affine[..., i],
+                static_shape,
+                static_affine,
+                moving_shape,
+                moving_affine
+            )
+            transformed.append(
+                affine_map.transform(
+                    moving_data[..., i],
+                    interpolation=interpolation
+                )
+            )
+        return DiPyDTI.to_nifti(moving, np.stack(transformed, axis=3)), affine
 
     @staticmethod
     def make_paths_dict(data_path: str, bvals_path: str, bvecs_path: str,
