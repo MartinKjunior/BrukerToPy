@@ -1,12 +1,15 @@
+"""Module to process diffusion tensor imaging (DTI) data using DiPy."""
+
 import sys
 import time
 import pprint
 import traceback
-import numpy as np
-import nibabel as nib
 from typing import Any
 from pathlib import Path
 from collections import OrderedDict
+
+import numpy as np
+import nibabel as nib
 
 from dipy.align import motion_correction
 from dipy.core.gradients import gradient_table, GradientTable
@@ -39,9 +42,9 @@ try:
 except ImportError:
     print("mpire not found, multiprocessing pipeline will not work.")
 
-def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
-                     pipeline=["motion_correction", "denoise", "fit_dti"],
-                     kwargs: dict = {}, n_jobs: int = 2) -> None:
+def multiprocess_dti(path: str, dti_col: str, id_col: str = "Study ID",
+                     pipeline: list = None, kwargs: dict = None,
+                     n_jobs: int = 2) -> None:
     """Use multiple CPU cores to process multiple DTI datasets in parallel.
     Requires bruker_to_py and mpire to be installed.
 
@@ -92,18 +95,20 @@ def multiprocess_DTI(path: str, dti_col: str, id_col: str = "Study ID",
         raise ImportError("bruker_to_py not found.")
     if WorkerPool is None:
         raise ImportError("mpire not found.")
+    kwargs = kwargs or {}
+    pipeline = pipeline or ["motion_correction", "denoise", "fit_dti"]
     if kwargs.get('degibbs', {}).get('num_processes', 1) != 1:
         raise ValueError("No additional processes allowed for degibbs.")
-    D_obj = init(path, msg=False)
+    data_object = init(path, msg=False)
     with WorkerPool(n_jobs) as pool:
         pool.imap_unordered(
-            _multiprocess_DTI_helper, 
-            [(D_obj, exam_id, dti_col, id_col, pipeline, kwargs) 
-             for exam_id in D_obj.avail_exam_ids]
+            _multiprocess_dti_helper,
+            [(data_object, exam_id, dti_col, id_col, pipeline, kwargs)
+             for exam_id in data_object.avail_exam_ids]
             )
 
-def _multiprocess_DTI_helper(D_obj, exam_id, dti_col, id_col, pipeline, kwargs):
-    path_handler = DiPyPathHandler(D_obj, exam_id)
+def _multiprocess_dti_helper(data_object, exam_id, dti_col, id_col, pipeline, kwargs):
+    path_handler = DiPyPathHandler(data_object, exam_id)
     dpdti = DiPyDTI(
         path_handler.get_data_paths(
             dti_col, id_col=id_col, return_metadata=True
@@ -125,7 +130,7 @@ class DiPyPathHandler:
     
     Parameters
     ----------
-    D_obj : btp.DataObject
+    data_object : btp.DataObject
         The DataObject instance from bruker_to_py.py.
     exam_id : int|str
         The exam id (MR number), e.g. 230215.
@@ -153,21 +158,21 @@ class DiPyPathHandler:
         Retrieve the paths to the data, bvals, bvecs, and mask for a given scan 
         id.
     """
-    def __init__(self, D_obj: Any|str, exam_id: int|str, 
-                 reco_id: int = 1, msg: bool = False, 
+    def __init__(self, data_object: Any|str, exam_id: int|str,
+                 reco_id: int = 1, msg: bool = False,
                  animal_overview: str = "animal_overview.xlsx") -> None:
         if btp is None:
             raise ImportError("bruker_to_py not found.")
-        if isinstance(D_obj, str):
-            if not Path(D_obj).exists():
-                raise FileNotFoundError(f'{D_obj} does not exist.')
-            D_obj = btp.init(D_obj, msg=msg, animal_overview=animal_overview)
-        self.D = D_obj
+        if isinstance(data_object, str):
+            if not Path(data_object).exists():
+                raise FileNotFoundError(f'{data_object} does not exist.')
+            data_object = btp.init(data_object, msg=msg, animal_overview=animal_overview)
+        self.data_object = data_object
         self.exam_id = int(exam_id)
         self.scan_id = None
         self.reco_id = reco_id
-    
-    def find_scan_id(self, data_col: str, id_col: str = "Study ID", 
+
+    def find_scan_id(self, data_col: str, id_col: str = "Study ID",
                      exam_id = None) -> int:
         '''
         Find the scan id for a given exam id based on a column in the 
@@ -192,13 +197,13 @@ class DiPyPathHandler:
             if self.exam_id is None:
                 raise ValueError('No exam id set.')
             exam_id = self.exam_id
-        if self.D.animal_overview is None:
+        if self.data_object.animal_overview is None:
             raise ValueError('No animal overview sheet found.')
-        return self.D.animal_overview.loc[
-            self.D.animal_overview[id_col] == exam_id, data_col
+        return self.data_object.animal_overview.loc[
+            self.data_object.animal_overview[id_col] == exam_id, data_col
             ].astype(int).values[0]
-    
-    def get_data_paths(self, dti_col: str = None, scan_id: int = None, 
+
+    def get_data_paths(self, dti_col: str = None, scan_id: int = None,
                        id_col: str = "Study ID", return_metadata = False
                        ) -> dict:
         """Retrieve the paths to the data, bvals, bvecs, and mask for a given 
@@ -209,12 +214,12 @@ class DiPyPathHandler:
         Parameters
         ----------
         dti_col : str
-            The column in self.D.animal_overview to check for the scan id.
+            The column in self.data_object.animal_overview to check for the scan id.
         scan_id : int, optional
             The scan id. If None, the scan id will be found based on the exam 
             id, by default None
         id_col : str, optional
-            The column in self.D.animal_overview to check for the exam id, 
+            The column in self.data_object.animal_overview to check for the exam id, 
             by default "Study ID"
         return_metadata : bool, optional
             Whether to add the methods, acqp, and visu_pars to the output 
@@ -231,7 +236,7 @@ class DiPyPathHandler:
             scan_id = self.find_scan_id(dti_col, id_col)
         data_paths = {}
         print(f'Looking for data for {self.exam_id}_{scan_id}...')
-        raw_data = self.D.pull_exam_data(
+        raw_data = self.data_object.pull_exam_data(
             self.exam_id, scan_id, self.reco_id, only_path=True
         )
         if return_metadata:
@@ -239,18 +244,18 @@ class DiPyPathHandler:
             data_paths['acqp'] = raw_data['acqp']
             data_paths['visu_pars'] = raw_data['recos']['visu_pars']
         data_paths['data_path'] = raw_data['recos']['path']
-        data_paths['bvals_path'] = self.D.pull_processed_data(
-            self.exam_id, 'BV', substring = f'{self.exam_id}_{scan_id}_bval', 
+        data_paths['bvals_path'] = self.data_object.pull_processed_data(
+            self.exam_id, 'BV', substring = f'{self.exam_id}_{scan_id}_bval',
             only_path=True
         )[0]
-        data_paths['bvecs_path'] = self.D.pull_processed_data(
-            self.exam_id, 'BV', substring = f'{self.exam_id}_{scan_id}_bvec', 
+        data_paths['bvecs_path'] = self.data_object.pull_processed_data(
+            self.exam_id, 'BV', substring = f'{self.exam_id}_{scan_id}_bvec',
             only_path=True
         )[0]
-        data_paths['savedir'] = self.D.get_savedir(self.exam_id)
+        data_paths['savedir'] = self.data_object.get_savedir(self.exam_id)
         try:
-            data_paths['mask_path'] = self.D.pull_processed_data(
-                self.exam_id, 'BM', substring = f'{self.exam_id}*mask', 
+            data_paths['mask_path'] = self.data_object.pull_processed_data(
+                self.exam_id, 'BM', substring = f'{self.exam_id}*mask',
                 only_path=True
             )[0]
         except FileNotFoundError:
@@ -280,7 +285,9 @@ class DiPyDTI():
     from dipy_dti_fit import DiPyDTI, DiPyPathHandler, init
     
     # Load the data (using DiPyPathHandler)
-    paths_dict = DiPyPathHandler(D_obj, exam_id).get_data_paths(
+    path = str(Path.cwd() ... / 'MRI_data') # locate your data folder
+    data_object = init(path, msg=False)
+    paths_dict = DiPyPathHandler(data_object, exam_id).get_data_paths(
         dti_col, id_col=id_col, return_metadata=True
         )
     dti = DiPyDTI(paths_dict)
@@ -309,9 +316,9 @@ class DiPyDTI():
     
     # Full example on multiple datasets using the bruker_to_py.py module
     path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to MRI_data
-    D_obj = init(path, msg=False)
-    for exam_id in D_obj.avail_exam_ids:
-        path_handler = DiPyPathHandler(D_obj, exam_id)
+    data_object = init(path, msg=False)
+    for exam_id in data_object.avail_exam_ids:
+        path_handler = DiPyPathHandler(data_object, exam_id)
         dpdti = DiPyDTI(
             path_handler.get_data_paths(
                 'dti', id_col='MR #', return_metadata=True
@@ -425,6 +432,8 @@ class DiPyDTI():
         Number of repetitions.
     motion_corrected : nib.Nifti1Image
         The motion corrected data.
+    averaged_data : nib.Nifti1Image
+        The data averaged across repetitions.
     reg_affines : np.ndarray
         The registration affines.
     b0_masked : nib.Nifti1Image
@@ -546,6 +555,7 @@ class DiPyDTI():
         self.num_reps: int = 1 # Number of repetitions
         # Processing outputs
         self.motion_corrected: nib.Nifti1Image = None
+        self.averaged_data: nib.Nifti1Image = None
         self.reg_affines: np.ndarray = None
         self.b0_masked: nib.Nifti1Image = None
         self.noise_mask: np.ndarray = None
@@ -556,7 +566,7 @@ class DiPyDTI():
         self.dti_fit: TensorFit = None
         if paths_dict is not None:
             self.load_data(**paths_dict, **kwargs)
-    
+
     def __str__(self) -> str:
         return f"""Paths:
 -----
@@ -565,16 +575,16 @@ Bvals: {self.bvals_path}
 Bvecs: {self.bvecs_path}
 Mask: {self.mask_path}
 Savedir: {self.savedir}"""
-    
+
     def __repr__(self) -> str:
         paths_dict = DiPyDTI.make_paths_dict(
-            self.data_path, self.bvals_path, self.bvecs_path, 
+            self.data_path, self.bvals_path, self.bvecs_path,
             self.mask_path, self.savedir
             )
         return f"DiPyDTI(paths_dict={paths_dict})"
-    
-    def load_data(self, data_path: str, bvals_path: str, bvecs_path: str, 
-                  mask_path: str = "", num_reps: int = 0, 
+
+    def load_data(self, data_path: str, bvals_path: str, bvecs_path: str,
+                  mask_path: str = "", num_reps: int = 0,
                   prepare_b0s: bool = True, check_data: bool = True, **kwargs):
         """Load the data, bvals, bvecs, and mask (if provided) into the DiPyDTI 
         object. Optionally set the savedir, method, acqp, and visu_pars. If 
@@ -637,17 +647,15 @@ Savedir: {self.savedir}"""
             self.method = kwargs.get('method')
             self.acqp = kwargs.get('acqp')
             self.visu_pars = kwargs.get('visu_pars')
-        self._set_num_reps(num_reps)
+        self.__set_num_reps(num_reps)
         if self.num_reps != 1 and prepare_b0s:
             self.bvals = np.tile(self.bvals, self.num_reps)
             self.bvecs = np.tile(self.bvecs, (self.num_reps, 1))
         if check_data:
-            self._check_loaded_data()
-    
-    def run_pipeline(
-        self, 
-        pipeline: list = ["motion_correction", "denoise", "fit_dti"], 
-        kwargs: dict[dict] = {}) -> None|TensorFit:
+            self.__check_loaded_data()
+
+    def run_pipeline(self, pipeline: list = None, kwargs: dict[dict] = None
+                     ) -> None|TensorFit:
         """Run a pipeline of processing steps. The default pipeline is
         in self.valid_steps (defined in __init__). After motion correction,
         the data is averaged if there are multiple repetitions.
@@ -676,13 +684,15 @@ Savedir: {self.savedir}"""
             If a value in kwargs is not a dictionary.
         
         """
-        self._check_pipeline_inputs(pipeline, kwargs)
+        kwargs = kwargs or {}
+        pipeline = pipeline or ["motion_correction", "denoise", "fit_dti"]
+        self.__check_pipeline_inputs(pipeline, kwargs)
         self.pipeline_steps = pipeline.copy()
-        self._log_pipeline(pipeline, kwargs)
+        self.__log_pipeline(pipeline, kwargs)
         current_data = self.diffusion_data
         try:
             for step in pipeline:
-                self._print_step(step)
+                self.__print_step(step)
                 start = time.perf_counter()
                 if step == "motion_correction":
                     correct_motion_kwargs = kwargs.get('motion_correction', {})
@@ -705,24 +715,24 @@ Savedir: {self.savedir}"""
                 elif step == "fit_dti":
                     dti_fit_kwargs = kwargs.get('fit_dti', {})
                     self.fit_dti(current_data, **dti_fit_kwargs)
-                    self._log_step(step, time=time.perf_counter()-start)
+                    self.__log_step(step, t=time.perf_counter()-start)
                     return self.dti_fit
                 elif step == "motion_correction":
                     pass
                 else:
                     raise ValueError(f"Step {step} not recognized in the "
                                      "pipeline.")
-                self._log_step(step, time=time.perf_counter()-start)
-        except Exception as e:
+                self.__log_step(step, t=time.perf_counter()-start)
+        except Exception as e: # pylint: disable=broad-except
             print(traceback.format_exc())
-            self._log_step(step, error=e)
-    
+            self.__log_step(step, error=e)
+
     def make_gradient_table(self, atol: float = 1.0, **kwargs) -> GradientTable:
         "Create a gradient table from the bvals and bvecs."
         if self.bvals is None or self.bvecs is None:
             raise ValueError("No bvals or bvecs found. Please load them first.")
         return gradient_table(self.bvals, self.bvecs, atol=atol, **kwargs)
-    
+
     def set_savedir(self, savedir: str):
         "Set the save directory for the processed data."
         try:
@@ -730,11 +740,11 @@ Savedir: {self.savedir}"""
             assert self.savedir.exists()
             self.savedir = self.savedir / 'DiPyDTI'
             self.savedir.mkdir(exist_ok=True)
-        except Exception as e:
+        except AssertionError as e:
             print(f"{savedir} is not a valid path")
             print(e)
-    
-    def get_scan_ids(self, data_path: Path, exam_id: int = None, 
+
+    def get_scan_ids(self, data_path: Path, exam_id: int = None,
                      scan_id: int = None) -> tuple[int, int]:
         "Extract the exam and scan IDs from the data path."
         if exam_id is not None and scan_id is not None:
@@ -745,34 +755,34 @@ Savedir: {self.savedir}"""
             self.exam_id = int(data_path.parts[-5].split('_')[2])
             self.scan_id = int(data_path.parts[-4])
             return self.exam_id, self.scan_id
-        except Exception as e:
+        except (ValueError, IndexError) as e:
             print(f"Could not extract the exam and scan IDs from {data_path}")
             print("Please set them manually.")
             print(e)
-    
+
     def correct_motion(self, nifti: nib.Nifti1Image, save: bool = True,
-        pipeline: list = ["center_of_mass", "translation", "rigid"]
-        ) -> tuple[nib.Nifti1Image, np.ndarray]:
+        pipeline: list = None) -> tuple[nib.Nifti1Image, np.ndarray]:
         "Correct for between-volume motion artifacts in the diffusion data."
-        self._check_gtab()
+        pipeline = pipeline or ["center_of_mass", "translation", "rigid"]
+        self.__check_gtab()
         if nifti.ndim == 5:
-            nifti = self._reshape_5D(nifti)
-        self.motion_corrected, self.reg_affines = motion_correction(
+            nifti = self.__reshape_5d(nifti)
+        self.motion_corrected, self.reg_affines = motion_correction( # pylint: disable=redundant-keyword-arg
             nifti, self.gtab, pipeline = pipeline
             )
         if save:
             self.save(
-                self.motion_corrected, 
-                newdir='MotionCorrected', 
+                self.motion_corrected,
+                newdir='MotionCorrected',
                 filename='motion_corrected'
                 )
             self.save(
-                self.reg_affines, 
-                newdir='MotionCorrected', 
+                self.reg_affines,
+                newdir='MotionCorrected',
                 filename='motion_affines'
                 )
         return self.motion_corrected, self.reg_affines
-    
+
     def average_repetitions(self, nifti: nib.Nifti1Image, num_reps: int = 1,
                             save: bool = True) -> nib.Nifti1Image:
         """Average the repetitions in the diffusion data. The number of 
@@ -792,13 +802,13 @@ Savedir: {self.savedir}"""
         self.num_reps = 1
         if save:
             self.save(
-                self.averaged_data, 
-                newdir='MotionCorrected', 
+                self.averaged_data,
+                newdir='MotionCorrected',
                 filename='averaged_data'
                 )
         return self.averaged_data
-    
-    def estimate_noise(self, nifti: nib.Nifti1Image, N: int = 1, 
+
+    def estimate_noise(self, nifti: nib.Nifti1Image, receiver_coils: int = 1,
                        method: str = 'piesno', **kwargs
                        ) -> tuple[np.ndarray, np.ndarray]:
         """Estimate the noise from the diffusion data. noise_mask is only 
@@ -806,17 +816,17 @@ Savedir: {self.savedir}"""
         calculated from."""
         if method == 'piesno':
             self.sigma, self.noise_mask = piesno(
-                nifti.get_fdata(), N=N, return_mask=True, **kwargs
+                nifti.get_fdata(), N=receiver_coils, return_mask=True, **kwargs
                 )
         elif method == 'other' or not method:
             self.sigma = estimate_sigma(
-                nifti.get_fdata(), N=N, **kwargs
+                nifti.get_fdata(), N=receiver_coils, **kwargs
                 )
         else:
             raise ValueError(f"Method {method} not recognized.")
         return self.sigma, self.noise_mask
-    
-    def degibbs(self, nifti: nib.Nifti1Image, slice_axis = 2, save: bool = True, 
+
+    def degibbs(self, nifti: nib.Nifti1Image, slice_axis = 2, save: bool = True,
                 **kwargs) -> nib.Nifti1Image:
         """Remove Gibbs ringing artifacts from the diffusion data. Option to use
         multiple cores by specifying num_processes=.
@@ -833,23 +843,23 @@ Savedir: {self.savedir}"""
         if kwargs.get('inplace', False) is True:
             raise ValueError("Do not set inplace=True in degibbs.")
         self.gibbs_suppressed = self.to_nifti(
-            nifti, 
+            nifti,
             gibbs_removal(
-                nifti.get_fdata(), 
-                slice_axis=slice_axis, 
+                nifti.get_fdata(),
+                slice_axis=slice_axis,
                 inplace=False,
                 **kwargs
                 )
             )
         if save:
             self.save(
-                self.gibbs_suppressed, 
-                newdir='GibbsSuppressed', 
+                self.gibbs_suppressed,
+                newdir='GibbsSuppressed',
                 filename='gibbs_suppressed'
                 )
         return self.gibbs_suppressed
-    
-    def denoise(self, nifti: nib.Nifti1Image, method: str = 'mppca', 
+
+    def denoise(self, nifti: nib.Nifti1Image, method: str = 'mppca',
                 save: bool = True, **kwargs) -> nib.Nifti1Image:
         """Denoise the diffusion data. Main params mentioned below, for more 
         options see the docstrings of the denoising functions.
@@ -879,57 +889,57 @@ Savedir: {self.savedir}"""
             default 'mppca'.
         """
         if method == 'patch2self':
-            self.denoised_data = self._patch2self(nifti, self.bvals, **kwargs)
+            self.denoised_data = self.__patch2self(nifti, self.bvals, **kwargs)
         elif method == 'mppca':
-            self.denoised_data = self._mppca(nifti, **kwargs)
+            self.denoised_data = self.__mppca(nifti, **kwargs)
         else:
             raise ValueError(f"Method {method} not recognized.")
         if save:
             self.save(
-                self.denoised_data, 
-                newdir='Denoised', 
+                self.denoised_data,
+                newdir='Denoised',
                 filename=f'denoised_{method}'
                 )
         return self.denoised_data
-    
-    def extract_brain(self, nifti: nib.Nifti1Image, save: bool = True, 
+
+    def extract_brain(self, nifti: nib.Nifti1Image, save: bool = True,
                       b0_threshold: int = 50, **kwargs
                       ) -> tuple[nib.Nifti1Image, nib.Nifti1Image]:
         "Extract the brain from the diffusion data."
         b0vol = self.extract_b0vol(nifti, b0_threshold=b0_threshold)
-        b0_masked, mask = self._median_otsu(b0vol, **kwargs)
+        b0_masked, mask = self.__median_otsu(b0vol, **kwargs)
         self.b0_masked = self.to_nifti(nifti, b0_masked)
         self.mask = self.to_nifti(nifti, mask)
         if save:
             self.save(
-                self.b0_masked, 
-                newdir='BrainExtracted', 
+                self.b0_masked,
+                newdir='BrainExtracted',
                 filename='b0_masked'
                 )
             self.save(self.mask, newdir='BrainMask', filename='brain_mask')
         return self.b0_masked, self.mask
-    
+
     def extract_b0vol(self, nifti: nib.Nifti1Image, b0_threshold: int = 50
                       ) -> np.ndarray:
         "Extract the b0 volume from the diffusion data."
         b0_idx = self.bvals < b0_threshold
         return nifti.get_fdata()[..., b0_idx]
-    
-    def fit_dti(self, nifti: nib.Nifti1Image, save: bool = True, 
+
+    def fit_dti(self, nifti: nib.Nifti1Image, save: bool = True,
                 model: str = 'WLS', **kwargs) -> TensorFit:
         """Fit the diffusion tensor model to the data. Options: 'WLS', 
         'RESTORE'. kwargs are passed into estimate_noise for the RESTORE model.
         """
-        self._check_gtab()
+        self.__check_gtab()
         masked_data = self.mask_data(nifti)
-        self.model = self._prepare_model(which=model, nifti=nifti, **kwargs)
+        self.model = self.__prepare_model(which=model, nifti=nifti, **kwargs)
         self.dti_fit = self.model.fit(masked_data)
         if save:
             self.save(
                 self.dti_fit, newdir='DTIFit', filename='dti_fit', nifti=nifti
                 )
         return self.dti_fit
-    
+
     def mask_data(self, nifti: nib.Nifti1Image) -> np.ndarray:
         "Mask the data with the brain mask, if available."
         if self.b0_masked is not None:
@@ -941,9 +951,9 @@ Savedir: {self.savedir}"""
             return (nifti.get_fdata().T * self.mask.T).T
         else:
             return nifti.get_fdata()
-    
-    def save(self, data: nib.Nifti1Image|np.ndarray|TensorFit, 
-             newdir: str = "", filename: str = "", 
+
+    def save(self, data: nib.Nifti1Image|np.ndarray|TensorFit,
+             newdir: str = "", filename: str = "",
              nifti: nib.Nifti1Image = None):
         """Save the data to the savedir directory. If newdir is provided, a new
         subdirectory will be created in the savedir directory. The filename of 
@@ -989,9 +999,9 @@ Savedir: {self.savedir}"""
         else:
             raise ValueError(f"Data type {type(data)} not recognized for "
                              "saving.")
-    
+
     @staticmethod
-    def make_paths_dict(data_path: str, bvals_path: str, bvecs_path: str, 
+    def make_paths_dict(data_path: str, bvals_path: str, bvecs_path: str,
                         mask_path: str = "", savedir: str = ""):
         """Create a dictionary of paths for easy loading of the DiPyDTI object.
         
@@ -999,16 +1009,16 @@ Savedir: {self.savedir}"""
             Compulsory: data_path, bvals_path, bvecs_path
             Optional: mask_path, savedir
         """
-        return {"data_path": data_path, "bvals_path": bvals_path, 
+        return {"data_path": data_path, "bvals_path": bvals_path,
                 "bvecs_path": bvecs_path, "mask_path": mask_path, 
                 "savedir": savedir}
-    
+
     @staticmethod
     def to_nifti(nifti, array) -> nib.Nifti1Image:
         "Convert an array to a Nifti1Image."
         return nib.Nifti1Image(array, nifti.affine, nifti.header)
-    
-    def _set_num_reps(self, num_reps: int):
+
+    def __set_num_reps(self, num_reps: int):
         "Set the number of repetitions."
         if not isinstance(num_reps, int):
             raise ValueError("Number of repetitions should be an integer.")
@@ -1018,8 +1028,8 @@ Savedir: {self.savedir}"""
             self.num_reps = self.method['PVM_NRepetitions']
         elif self.num_reps == 0:
             self.num_reps = 1
-    
-    def _check_loaded_data(self):
+
+    def __check_loaded_data(self):
         "Check if the loaded data is valid."
         print("Checking loaded data...")
         # Diffusion data
@@ -1052,8 +1062,8 @@ Savedir: {self.savedir}"""
             if self.mask.shape != self.diffusion_data.shape[:3]:
                 raise ValueError("Mask shape should match the diffusion data.")
         print("Loaded data is valid.")
-    
-    def _check_pipeline_inputs(self, pipeline: list, kwargs: dict):
+
+    def __check_pipeline_inputs(self, pipeline: list, kwargs: dict):
         "Check the inputs for the run_pipeline method."
         print("Checking pipeline inputs...")
         # Check if savedir is set
@@ -1081,8 +1091,8 @@ Savedir: {self.savedir}"""
                     f"Value for step {step} in kwargs should be a dictionary."
                     )
         print("Pipeline inputs are in valid format.")
-    
-    def _log_pipeline(self, pipeline: list, kwargs: dict):
+
+    def __log_pipeline(self, pipeline: list, kwargs: dict):
         "Log the pipeline parameters to a text file."
         file_timestr = time.strftime("%Y%m%d-%H%M%S")
         self.savedir = self.savedir / f"{file_timestr}"
@@ -1100,12 +1110,12 @@ Additional keyword arguments were:
 
 If a step was successful, it will be logged here:"""
         self.logfile = self.savedir / f'DiPyDTI_log_{file_timestr}.txt'
-        with open(self.logfile, 'w') as f:
+        with open(self.logfile, 'w', encoding="utf-8") as f:
             f.write(log_msg)
         print(f"Logging the pipeline to {self.logfile}")
         print(log_msg)
-    
-    def _print_step(self, step: str):
+
+    def __print_step(self, step: str):
         """Print the step to the console surrounded by *'s, example:
         *********
         *Denoise*
@@ -1114,51 +1124,51 @@ If a step was successful, it will be logged here:"""
         print(f"{'*' * (len(step) + 2)}")
         print(f"*{step.capitalize()}*")
         print(f"{'*' * (len(step) + 2)}")
-    
-    def _log_step(self, step: str, error: Exception = None, 
-                  time: float = ""):
+
+    def __log_step(self, step: str, error: Exception = None,
+                  t: float|str = ""):
         "Append the step to the log file."
         step = step.capitalize()
-        with open(self.logfile, 'a') as f:
+        with open(self.logfile, 'a', encoding="utf-8") as f:
             if error is None:
-                f.write(f"\n{step} ran succesfully in {time:.2f} seconds.")
+                f.write(f"\n{step} ran succesfully in {t:.2f} seconds.")
             else:
                 f.write(f"\n{step} failed with the following error: {error}")
                 f.write("\nExiting the pipeline.")
-    
-    def _reshape_5D(self, nifti: nib.Nifti1Image) -> nib.Nifti1Image:
+
+    def __reshape_5d(self, nifti: nib.Nifti1Image) -> nib.Nifti1Image:
         "Reshape the 5D data to 4D."
         print("Reshaping 5D data to 4D...")
         return self.to_nifti(
-            nifti, 
+            nifti,
             nifti.get_fdata().reshape(*nifti.shape[:3], -1)
             )
-    
-    def _patch2self(self, nifti: nib.Nifti1Image, bvals, model='ols', 
-                    shift_intensity=True, clip_negative_vals=False, 
+
+    def __patch2self(self, nifti: nib.Nifti1Image, bvals, model='ols',
+                    shift_intensity=True, clip_negative_vals=False,
                     b0_threshold=50, **kwargs) -> nib.Nifti1Image:
         "Run the patch2self denoising method with default parameters."
         return self.to_nifti(
-            nifti, 
+            nifti,
             patch2self(
-                nifti.get_fdata(), 
-                bvals, 
+                nifti.get_fdata(),
+                bvals,
                 model=model,
-                shift_intensity=shift_intensity, 
+                shift_intensity=shift_intensity,
                 clip_negative_vals=clip_negative_vals,
-                b0_threshold=b0_threshold, 
+                b0_threshold=b0_threshold,
                 **kwargs
                 )
             )
-    
-    def _mppca(self, nifti: nib.Nifti1Image, **kwargs) -> nib.Nifti1Image:
+
+    def __mppca(self, nifti: nib.Nifti1Image, **kwargs) -> nib.Nifti1Image:
         "Run the MPPCA denoising method."
         return self.to_nifti(
-            nifti, 
+            nifti,
             mppca(nifti.get_fdata(), **kwargs)
             )
 
-    def _prepare_model(self, which: str = 'WLS', nifti: nib.Nifti1Image = None,
+    def __prepare_model(self, which: str = 'WLS', nifti: nib.Nifti1Image = None,
                        **kwargs) -> TensorModel:
         "Prepare the tensor model for fitting."
         if which == 'WLS':
@@ -1166,19 +1176,19 @@ If a step was successful, it will be logged here:"""
         elif which == 'RESTORE':
             sigma, _ = self.estimate_noise(nifti, **kwargs)
             return TensorModel(self.gtab, fit_method='RESTORE', sigma=sigma)
-    
-    def _check_gtab(self):
+
+    def __check_gtab(self):
         "Check if the gradient table is available and create one if not"
         if self.gtab is None:
             print("No gradient table found. Creating one with default params.")
             self.gtab = self.make_gradient_table()
-    
-    def _median_otsu(self, nifti: nib.Nifti1Image, median_radius=2, numpass=1, 
+
+    def __median_otsu(self, nifti: nib.Nifti1Image, median_radius=2, numpass=1,
                      **kwargs) -> tuple[np.ndarray, np.ndarray]:
         "Run the median_otsu function with default parameters."
         return median_otsu(
             nifti.get_fdata(),
-            median_radius=median_radius, 
-            numpass=numpass, 
+            median_radius=median_radius,
+            numpass=numpass,
             **kwargs
             )
