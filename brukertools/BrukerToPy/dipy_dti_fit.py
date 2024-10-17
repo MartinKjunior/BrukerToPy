@@ -705,7 +705,7 @@ Savedir: {self.savedir}"""
                 elif step == "fit_dti":
                     dti_fit_kwargs = kwargs.get('fit_dti', {})
                     self.fit_dti(current_data, **dti_fit_kwargs)
-                    self._log_step(step)
+                    self._log_step(step, time=time.perf_counter()-start)
                     return self.dti_fit
                 elif step == "motion_correction":
                     pass
@@ -1115,8 +1115,8 @@ If a step was successful, it will be logged here:"""
         print(f"*{step.capitalize()}*")
         print(f"{'*' * (len(step) + 2)}")
     
-    def _log_step(self, step: str = None, error: Exception = None, 
-                  time: float = None):
+    def _log_step(self, step: str, error: Exception = None, 
+                  time: float = ""):
         "Append the step to the log file."
         step = step.capitalize()
         with open(self.logfile, 'a') as f:
