@@ -4,23 +4,24 @@ import sys
 import time
 import pprint
 import traceback
-from typing import Any
-from pathlib import Path
 from collections import OrderedDict
+from pathlib import Path
+from typing import Any
 
-import numpy as np
 import nibabel as nib
+import numpy as np
 
 from dipy.align import motion_correction
-from dipy.core.gradients import gradient_table, GradientTable
-from dipy.io.image import load_nifti
-from dipy.io.gradients import read_bvals_bvecs
-from dipy.denoise.noise_estimate import piesno, estimate_sigma
-from dipy.denoise.patch2self import patch2self
-from dipy.denoise.localpca import mppca
+from dipy.align.imaffine import AffineMap
+from dipy.core.gradients import GradientTable, gradient_table
 from dipy.denoise.gibbs import gibbs_removal
+from dipy.denoise.localpca import mppca
+from dipy.denoise.noise_estimate import estimate_sigma, piesno
+from dipy.denoise.patch2self import patch2self
+from dipy.io.gradients import read_bvals_bvecs
+from dipy.io.image import load_nifti
+from dipy.reconst.dti import TensorFit, TensorModel
 from dipy.segment.mask import median_otsu
-from dipy.reconst.dti import TensorModel, TensorFit
 
 if sys.version_info < (3, 10):
     raise ImportError(
@@ -28,6 +29,7 @@ if sys.version_info < (3, 10):
         "hints. If those are removed, the code should work with python 3.8+ "
         "(untested)."
         )
+
 #make bruker_to_py optional
 btp: Any = None
 try:
@@ -35,6 +37,7 @@ try:
     init = btp.init
 except ImportError:
     print("bruker_to_py not found, some functions may not work.")
+
 #make mpire optional
 WorkerPool: Any = None
 try:
@@ -476,8 +479,9 @@ class DiPyDTI():
     get_scan_ids(data_path: Path) -> tuple[int, int]
         Extract the exam and scan IDs from the data path.
         
-    correct_motion(nifti: nib.Nifti1Image, save: bool = True,
-                    pipeline: list = ["center_of_mass", "translation", "rigid"]) 
+    correct_motion(nifti: nib.Nifti1Image, pipeline: list = None,
+                    affine: np.ndarray = None, save: bool = True
+                    ) -> tuple[nib.Nifti1Image, np.ndarray]
         Correct for between-volume motion artifacts in the diffusion data.
         
     average_repetitions(nifti: nib.Nifti1Image, num_reps: int = 1,
@@ -486,8 +490,9 @@ class DiPyDTI():
         is extracted from the method file, or can be set manually using the 
         num_reps attribute.
         
-    estimate_noise(nifti: nib.Nifti1Image, N: int = 1, method: str = 'piesno',
-                    **kwargs) -> tuple[np.ndarray, np.ndarray]
+    estimate_noise(nifti: nib.Nifti1Image, receiver_coils: int = 1, 
+                    method: str = 'piesno', **kwargs
+                    ) -> tuple[np.ndarray, np.ndarray]
         Estimate the noise from the diffusion data. noise_mask is only returned 
         for piesno and it's a mask of the background where the noise is 
         calculated from.
@@ -723,7 +728,7 @@ Savedir: {self.savedir}"""
                     raise ValueError(f"Step {step} not recognized in the "
                                      "pipeline.")
                 self.__log_step(step, t=time.perf_counter()-start)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e:
             print(traceback.format_exc())
             self.__log_step(step, error=e)
 
@@ -760,15 +765,23 @@ Savedir: {self.savedir}"""
             print("Please set them manually.")
             print(e)
 
-    def correct_motion(self, nifti: nib.Nifti1Image, save: bool = True,
-        pipeline: list = None) -> tuple[nib.Nifti1Image, np.ndarray]:
-        "Correct for between-volume motion artifacts in the diffusion data."
+    def correct_motion(self, nifti: nib.Nifti1Image, pipeline: list = None,
+        reg_affine: np.ndarray = None, static: nib.Nifti1Image = None, 
+        save: bool = True) -> tuple[nib.Nifti1Image, np.ndarray]:
+        """Correct for between-volume motion artifacts in the diffusion data. 
+        By default, the pipeline is ['center_of_mass', 'translation', 'rigid'].
+        To apply a registration affine from a previous motion correction, supply
+        both reg_affine and static (image). reg_affine is the affine output of 
+        motion_correct and static is the static image used in the registration. 
+        static can also be a tuple of (static_img.shape, static_img.affine).
+        """
         pipeline = pipeline or ["center_of_mass", "translation", "rigid"]
         self.__check_gtab()
         if nifti.ndim == 5:
             nifti = self.__reshape_5d(nifti)
-        self.motion_corrected, self.reg_affines = motion_correction( # pylint: disable=redundant-keyword-arg
-            nifti, self.gtab, pipeline = pipeline
+        self.motion_corrected, self.reg_affines = self.__motion_correction(
+            nifti, self.gtab, pipeline = pipeline, affine = reg_affine,
+            static = static
             )
         if save:
             self.save(
@@ -782,6 +795,37 @@ Savedir: {self.savedir}"""
                 filename='motion_affines'
                 )
         return self.motion_corrected, self.reg_affines
+
+    def apply_affine(self, moving: nib.Nifti1Image, affine: np.ndarray, 
+                     static: nib.Nifti1Image|tuple[tuple, np.ndarray] = None, 
+                     interpolation: str = 'nearest'
+                     ) -> tuple[nib.Nifti1Image, np.ndarray]:
+        """Apply an affine matrix to the moving image based on affine and the 
+        static image. The static image is used to determine the shape and affine
+        and can be supplied as a nibabel image or a tuple of (shape, affine)."""
+        static = static or moving
+        transformed = []
+        moving_data = moving.get_fdata()
+        moving_shape, moving_affine = moving.shape[:-1], moving.affine
+        if isinstance(static, nib.Nifti1Image):
+            static_shape, static_affine = static.shape[:-1], static.affine
+        else:
+            static_shape, static_affine = static
+        for i in range(moving.shape[-1]):
+            affine_map = AffineMap(
+                affine[..., i],
+                static_shape,
+                static_affine,
+                moving_shape,
+                moving_affine
+            )
+            transformed.append(
+                affine_map.transform(
+                    moving_data[..., i],
+                    interpolation=interpolation
+                )
+            )
+        return self.to_nifti(moving, np.stack(transformed, axis=3)), affine
 
     def average_repetitions(self, nifti: nib.Nifti1Image, num_reps: int = 1,
                             save: bool = True) -> nib.Nifti1Image:
@@ -1135,6 +1179,19 @@ If a step was successful, it will be logged here:"""
             else:
                 f.write(f"\n{step} failed with the following error: {error}")
                 f.write("\nExiting the pipeline.")
+
+    def __motion_correction(self, nifti: nib.Nifti1Image, gtab: GradientTable,
+                            pipeline: list = None, affine: np.ndarray = None,
+                            static: nib.Nifti1Image = None
+                            ) -> tuple[nib.Nifti1Image, np.ndarray]:
+        "Run the motion correction pipeline."
+        pipeline = pipeline or ["center_of_mass", "translation", "rigid"]
+        if affine is not None and static is not None:
+            if affine.shape[-1] != nifti.shape[-1]:
+                raise ValueError("Affine matrix should have the same number of "
+                                 "volumes as the diffusion data.")
+            return self.apply_affine(nifti, affine, static)
+        return motion_correction(nifti, gtab, pipeline=pipeline)
 
     def __reshape_5d(self, nifti: nib.Nifti1Image) -> nib.Nifti1Image:
         "Reshape the 5D data to 4D."
