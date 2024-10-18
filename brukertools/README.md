@@ -34,7 +34,7 @@ animal_overview should be a csv or excel file with at least 2 columns with diffe
 - Scan ID: The number of the scan, e.g. 10, shown in paravision as E10 on the exam card.
 - Reco ID: The reconstruction number, e.g. 1. The default image is 1, any additional processing, such as returning phase images, will have a different reco id. Diffusion images are usually reco id 1.
 
-### Allows to do DTI processing of bruker data using DiPy package:
+### DTI processing of bruker data using DiPy package:
 
 **Prerequisites:**
 
