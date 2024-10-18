@@ -163,7 +163,7 @@ data_dict['recos']['data'] # to access the image
  * if you only need the path without loading the data, use `only_path=True` (overrides `to_dict=` and `as_numpy=`)
 
 ```py
-data_list = D_obj.pull_processed_data(
+data_collection = D_obj.pull_processed_data(
     230215, # exam ID
     ['DiPyDTI', '*', 'DTIFit'], # path to the data if nested, otherwise use a single string
     to_dict = False, # if True, returns {filename: <loaded object>}
@@ -171,8 +171,8 @@ data_list = D_obj.pull_processed_data(
     substring = '9_mean_diffusivity', # a part of the filename that identifies the file, returns all that match
     only_path = False
 )
-data_list[-1] # to access the image if to_dict=False
-data_list[filename] # to access the image if to_dict=True
+data_collection[-1] # to access the image if to_dict=False
+data_collection[filename] # to access the image if to_dict=True
 ```
 
 ## References
