@@ -342,7 +342,7 @@ class DataObject:
         pull_processed_data - fetches data from the processed data folder
         save_processed_data - saves data to the processed data folder
         prepare_savedirs - creates new directories for saving data in the processed data folder
-        save_bval_bves - saves bval and bvec files (for dwi data)
+        save_bval_bvec - saves bval and bvec files (for dwi data)
         gen_processed_metadata - convenience function for accessing the method, acqp and visu_pars
         get_savedir - returns the path to the processed data folder
     '''
@@ -935,7 +935,8 @@ class DataObject:
                 yield nifti, arr, name, exam_id
     
     def save_bval_bvec(self, identifier: str|Iterable[Iterable[int]], 
-                       round: bool = True, ext: bool = False):
+                       exam_col: str = 'Study ID', round: bool = True, 
+                       ext: bool = False):
         '''
         Loads effective b-values and b-vectors from the method file and saves 
         them in BVals folder in processed data folder. Only the first 5 decimal
@@ -945,11 +946,13 @@ class DataObject:
         Parameters
         ----------
         identifier : str|Iterable[Iterable[int]]
-            If str, column name in animal_overview to identify the phase contrast study_ids.
+            If str, column name in animal_overview to identify the diffusion study_ids.
             If Iterable, an iterable containing exam_ids and study_ids.
                 For example, ([1, 2, 3], [1, 2, 3]) will load the data for 
                 exam_id, scan_id = 1, 1, then exam_id, scan_id = 2,2...
-            Iterables are for example lists, tuples, sets, arrays...
+        exam_col : str, optional
+            Column name in animal_overview containing the exam_ids. 
+            The default is 'Study ID'.
         round : bool, optional
             Rounds b-values to the nearest hundred. The default is True.
         ext : bool, optional
@@ -963,7 +966,7 @@ class DataObject:
         if isinstance(identifier, str):
             animal_overview = self.animal_overview.dropna(subset=[identifier])
             #extract the columns with phase contrast study_ids
-            exam_ids: pd.Series = animal_overview['Study ID'].astype(int)
+            exam_ids: pd.Series = animal_overview[exam_col].astype(int)
             study_ids: pd.Series = animal_overview[identifier].astype(int)
         elif isinstance(identifier, Iterable):
             exam_ids = pd.Series(identifier[0])

@@ -19,7 +19,7 @@ Once loaded, use `bruker_to_py.py`:
 import bruker_to_py as btp
 from pathlib import Path
 
-cwd = Path.cwd() # Should be the path to rat data, not the script
+cwd = Path.cwd().parent / 'MRI_data' # Should be the path to rat data, not the script
 D_obj = btp.init(str(cwd), msg=False, animal_overview="animal_overview.xlsx")
 ```
 
@@ -28,6 +28,14 @@ D_obj = btp.init(str(cwd), msg=False, animal_overview="animal_overview.xlsx")
 **Prerequisites:**
 
 Diffusion processing requires knowing the diffusion gradient strengths used to generate your image. These are found in the methods files that come with the diffusion data. bval is `'PVM_DwEffBval'` and bvec is `'PVM_DwGradVec'`. These need to be stored as text files, each value separated by comma. The `DataObject` from `bruker_to_py` has function `save_bval_bvec` to automatically read in, process and save bvals and bvecs. To run DiPyDTI, you need at least: your diffusion data as nifti, bvals and bvecs files (a brain mask is optional to save time computing the DTI fit).
+
+```py
+D_obj.save_bval_bvec(
+    identifier='dti', # name of the column with scan IDs of diffusion data
+    exam_col='MR #', # name of the column with exam IDs of the animals
+    round=True # whether to round the bvals to the nearest 100
+)
+```
 
 `DiPyPathHandler` from `dipy_dti_fit.py` provides a convenient way of fetching the required data paths. It requires a csv-like file with at least 2 columns 
 showing the animal's exam_id and scan_id to identify the DTI datasets. This is 
