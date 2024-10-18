@@ -20,8 +20,19 @@ import bruker_to_py as btp
 from pathlib import Path
 
 cwd = Path.cwd().parent / 'MRI_data' # Should be the path to rat data, not the script
-D_obj = btp.init(str(cwd), msg=False, animal_overview="animal_overview.xlsx")
+D_obj = btp.init(
+    str(cwd), # path to the data folder (contains bruker and _loaded folders)
+    msg=False, # whether to show the data structure (exam_id, scan_id, reco_id)
+    animal_overview="animal_overview.xlsx" # if following the folder structure below, filename is enough, otherwise provide the absolute path
+    )
 ```
+animal_overview should be a csv or excel file with at least 2 columns with different animal's exam IDs and the scan IDs of the diffusion scans for DTI.
+
+### ID definitions
+
+- Exam ID: The MR number, number of a new exam card in paravision, e.g. 230215.
+- Scan ID: The number of the scan, e.g. 10, shown in paravision as E10 on the exam card.
+- Reco ID: The reconstruction number, e.g. 1. The default image is 1, any additional processing, such as returning phase images, will have a different reco id. Diffusion images are usually reco id 1.
 
 ### Allows to do DTI processing of bruker data using DiPy package:
 
