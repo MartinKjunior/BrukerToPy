@@ -24,7 +24,7 @@ D_obj = btp.init(
     str(cwd), # path to the data folder (contains bruker and _loaded folders)
     msg=False, # whether to show the data structure (exam_id, scan_id, reco_id)
     animal_overview="animal_overview.xlsx" # if following the folder structure below, filename is enough, otherwise provide the absolute path
-    )
+)
 ```
 animal_overview should be a csv or excel file with at least 2 columns with different animal's exam IDs and the scan IDs of the diffusion scans for DTI.
 
@@ -86,11 +86,14 @@ dpdti = DiPyDTI()
 dpdti.load_data(
     data_path, bvals_path, bvecs_path, savedir=savedir_path, exam_id=230215, 
     scan_id=6
-    )
+)
 dpdti.run_pipeline()
 ```
 
 **Example using the bruker_to_py.py objects:**
+
+* requires `bruker_to_py`
+
 ```py
 from dipy_dti_fit import DiPyDTI, DiPyPathHandler, init
 path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to MRI_data
@@ -111,6 +114,9 @@ for exam_id in D_obj.avail_exam_ids:
 ```
 
 **Example of running DiPyDTI on multiple cores in parallel:**
+
+* requires `mpire`
+
 ```py
 from dipy_dti_fit import multiprocess_DTI
 path = str(Path.cwd().parent / 'MRI_data')
