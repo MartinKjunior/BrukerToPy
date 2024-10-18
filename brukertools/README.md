@@ -94,16 +94,20 @@ dpdti.run_pipeline()
 ```py
 from dipy_dti_fit import DiPyDTI, DiPyPathHandler, init
 path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to MRI_data
-D_obj = init(path, msg=False)
+D_obj = init(path, msg=False, animal_overview="animal_overview.xlsx")
 for exam_id in D_obj.avail_exam_ids:
     path_handler = DiPyPathHandler(D_obj, exam_id)
     dpdti = DiPyDTI(
-        path_handler.get_data_paths('dti', id_col='MR #', return_metadata=True)
+        path_handler.get_data_paths(
+            'dti', # name of the column with scan IDs of diffusion data
+            id_col='MR #', # name of the column with exam IDs of the animals
+            return_metadata=True
         )
+    )
     dpdti.run_pipeline(
         pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
         kwargs = {'degibbs':{'num_processes':3}}
-        )
+    )
 ```
 
 **Example of running DiPyDTI on multiple cores in parallel:**
