@@ -551,7 +551,7 @@ class DiPyDTI():
             "motion_correction", "degibbs", "denoise","extract_brain", "fit_dti"
             ]
         # Metadata
-        self.methods: OrderedDict = None
+        self.method: OrderedDict = None
         self.acqp: OrderedDict = None
         self.visu_pars: OrderedDict = None
         # Scan info
