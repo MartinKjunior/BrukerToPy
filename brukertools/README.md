@@ -123,6 +123,58 @@ path = str(Path.cwd().parent / 'MRI_data')
 multiprocess_DTI(path, dti_col = 'dti', id_col = 'MR #', n_jobs = 3)
 ```
 
+## Recipes
+
+### Loading a pickled object (methods, acqp, visu_pars, TensorFit... ending .npy) 
+
+```py
+import numpy as np
+path_to_object = R"..." # R means "raw string", so \ is not treated as a special symbol
+python_object = np.load(path_to_object, allow_pickle=True).item()
+```
+
+### Loading a nifti image
+
+```py
+import nibabel as nib
+path_to_nii = R"..." # R means "raw string", so \ is not treated as a special symbol
+nifti = nib.load(path_to_nii)
+```
+
+### Loading an unprocessed file
+
+ * if you only need the path without loading the data, use `only_path=True` (overrides `as_numpy=`)
+
+```py
+data_dict = D_obj.pull_exam_data(
+    230215, # exam ID
+    6, # scan ID
+    1, # reco ID
+    as_numpy = False, # False returns nifti1image, otherwise ndarray
+    only_path = False
+)
+data_dict['recos']['data'] # to access the image
+```
+
+ * returns a dictionary with `dict_keys(['exam_id', 'scan_id', 'acqp', 'method', 'recos'])` and in `['recos']` there are `dict_keys(['path', 'data', 'visu_pars'])` (`'data'` missing if `only_path=True`).
+
+### Loading a processed file
+
+ * if you only need the path without loading the data, use `only_path=True` (overrides `to_dict=` and `as_numpy=`)
+
+```py
+data_list = D_obj.pull_processed_data(
+    230215, # exam ID
+    ['DiPyDTI', '*', 'DTIFit'], # path to the data if nested, otherwise use a single string
+    to_dict = False, # if True, returns {filename: <loaded object>}
+    as_numpy = False, # False returns nifti1image, otherwise ndarray
+    substring = '9_mean_diffusivity', # a part of the filename that identifies the file, returns all that match
+    only_path = False
+)
+data_list[-1] # to access the image if to_dict=False
+data_list[filename] # to access the image if to_dict=True
+```
+
 ## References
 
 `load_bruker.py` uses [BrkRaw](https://github.com/BrkRaw/brkraw):
