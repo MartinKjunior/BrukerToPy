@@ -28,15 +28,15 @@ D_obj = btp.init(
 ```
 animal_overview should be a csv or excel file with at least 2 columns with different animal's exam IDs and the scan IDs of the diffusion scans for DTI.
 
-### ID definitions
+## ID definitions
 
-- Exam ID: The MR number, number of a new exam card in paravision, e.g. 230215.
-- Scan ID: The number of the scan, e.g. 10, shown in paravision as E10 on the exam card.
-- Reco ID: The reconstruction number, e.g. 1. The default image is 1, any additional processing, such as returning phase images, will have a different reco id. Diffusion images are usually reco id 1.
+- **Exam ID**: The MR number, number of a new exam card in paravision, e.g. 230215.
+- **Scan ID**: The number of the scan, e.g. 10, shown in paravision as E10 on the exam card.
+- **Reco ID**: The reconstruction number, e.g. 1. The default image is 1, any additional processing, such as returning phase images, will have a different reco id. Diffusion images are usually reco id 1.
 
-### DTI processing of bruker data using DiPy package:
+## DTI processing of bruker data using DiPy package:
 
-**Prerequisites:**
+### Prerequisites:
 
 Diffusion processing requires knowing the diffusion gradient strengths used to generate your image. These are found in the methods files that come with the diffusion data. bval is `'PVM_DwEffBval'` and bvec is `'PVM_DwGradVec'`. These need to be stored as text files, each value separated by comma. The `DataObject` from `bruker_to_py` has function `save_bval_bvec` to automatically read in, process and save bvals and bvecs. To run DiPyDTI, you need at least: your diffusion data as nifti, bvals and bvecs files (a brain mask is optional to save time computing the DTI fit).
 
@@ -52,7 +52,7 @@ D_obj.save_bval_bvec(
 showing the animal's exam_id and scan_id to identify the DTI datasets. This is 
 the third input for `btp.init()`, or second input to `btp.DataObject()`.
 
-**Usual folder structure:**
+### Usual folder structure:
 
 ```
 Study_PRIME000/
@@ -76,7 +76,7 @@ D_obj = bruker_to_py.init('<path to /MRI_data>')
 D_obj.prepare_savedirs('BrainMask')
 ```
 
-**Example using paths to files:**
+**1. Example using paths to files:**
 ```py
 # DiPyDTI can be instantiated using paths to the necessary files
 # Suppose you have found the paths to your files and stored them as strings
@@ -90,7 +90,7 @@ dpdti.load_data(
 dpdti.run_pipeline()
 ```
 
-**Example using the bruker_to_py.py objects:**
+**2. Example using the bruker_to_py.py objects (recommended):**
 
 * requires `bruker_to_py`
 
@@ -113,7 +113,7 @@ for exam_id in D_obj.avail_exam_ids:
     )
 ```
 
-**Example of running DiPyDTI on multiple cores in parallel:**
+**3. Example of running DiPyDTI on multiple cores in parallel:**
 
 * requires `mpire`
 
@@ -140,6 +140,8 @@ import nibabel as nib
 path_to_nii = R"..." # R means "raw string", so \ is not treated as a special symbol
 nifti = nib.load(path_to_nii)
 ```
+
+### ***bruker_to_py***
 
 ### Loading an unprocessed file
 
