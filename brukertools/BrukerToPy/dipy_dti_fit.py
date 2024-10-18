@@ -810,9 +810,9 @@ Savedir: {self.savedir}"""
             data = data.reshape(*data.shape[:3], -1, num_reps)
         data_averaged = data.mean(axis=-1)
         self.averaged_data = self.to_nifti(nifti, data_averaged)
-        if self.num_reps != 1:
-            self.bvecs = self.bvecs[:data_averaged.shape[-1]]
-            self.bvals = self.bvals[:data_averaged.shape[-1]]
+        self.bvecs = self.bvecs[:data_averaged.shape[-1]]
+        self.bvals = self.bvals[:data_averaged.shape[-1]]
+        self.gtab = self.make_gradient_table()
         self.num_reps = 1
         if save:
             self.save(
