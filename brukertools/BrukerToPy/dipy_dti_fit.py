@@ -921,6 +921,8 @@ Savedir: {self.savedir}"""
                       ) -> tuple[nib.Nifti1Image, nib.Nifti1Image]:
         "Extract the brain from the diffusion data."
         b0vol = self.extract_b0vol(nifti, b0_threshold=b0_threshold)
+        if b0vol.ndim == 4:
+            b0vol = b0vol.mean(axis=-1)
         b0_masked, mask = self.__median_otsu(b0vol, **kwargs)
         self.b0_masked = self.to_nifti(nifti, b0_masked)
         self.mask = self.to_nifti(nifti, mask)
