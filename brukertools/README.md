@@ -19,9 +19,9 @@ Once loaded, use `bruker_to_py.py`:
 import bruker_to_py as btp
 from pathlib import Path
 
-cwd = Path.cwd().parent / 'MRI_data' # Should be the path to rat data, not the script
+cwd = Path.cwd().parent / 'MRI_data' # Should be the path to Bruker data, not the script
 D_obj = btp.init(
-    str(cwd), # path to the data folder (contains bruker and _loaded folders)
+    str(cwd), # path to the data folder (contains Bruker and _loaded folders)
     msg=False, # whether to show the data structure (exam_id, scan_id, reco_id)
     animal_overview="animal_overview.xlsx" # if following the folder structure below, filename is enough, otherwise provide the absolute path
 )
@@ -48,7 +48,7 @@ D_obj.save_bval_bvec(
 )
 ```
 
-`DiPyPathHandler` from `dipy_dti_fit.py` provides a convenient way of fetching the required data paths. It requires a csv-like file with at least 2 columns 
+`DiPyPathHandler` from `path_handler.py` provides a convenient way of fetching the required data paths. It requires a csv-like file with at least 2 columns 
 showing the animal's exam_id and scan_id to identify the DTI datasets. This is 
 the third input for `btp.init()`, or second input to `btp.DataObject()`.
 
@@ -67,6 +67,7 @@ Study_PRIME000/
 └── Scripts/
     ├── bruker_to_py.py
     ├── dipy_dti_fit.py
+    ├── path_handler.py
     └── main.ipynb
 ```
 
@@ -95,14 +96,15 @@ dpdti.run_pipeline()
 * requires `bruker_to_py`
 
 ```py
-from dipy_dti_fit import DiPyDTI, DiPyPathHandler, init
+from dipy_dti_fit import DiPyDTI
+from path_handler import DiPyPathHandler, init
 path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to MRI_data
 D_obj = init(path, msg=False, animal_overview="animal_overview.xlsx")
 for exam_id in D_obj.avail_exam_ids:
     path_handler = DiPyPathHandler(D_obj, exam_id)
     dpdti = DiPyDTI(
         path_handler.get_data_paths(
-            'dti', # name of the column with scan IDs of diffusion data
+            dti_col='dti', # name of the column with scan IDs of diffusion data
             id_col='MR #', # name of the column with exam IDs of the animals
             return_metadata=True
         )
