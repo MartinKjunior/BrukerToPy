@@ -1,4 +1,8 @@
-"""Module to process diffusion tensor imaging (DTI) data using DiPy."""
+"""Module to process diffusion tensor imaging (DTI) data using DiPy.
+
+@author: Martin Kozár (University of Manchester)
+@contact: martin.kozar@manchester.ac.uk
+"""
 
 import sys
 import time
@@ -40,78 +44,6 @@ except ImportError:
     print("mpire and path_handler not found, multiprocessing pipeline will not "
           "work.")
 
-def multiprocess_dti(path: str, dti_col: str, id_col: str = "Study ID",
-                     pipeline: list = None, kwargs: dict = None,
-                     n_jobs: int = 2) -> None:
-    """Use multiple CPU cores to process multiple DTI datasets in parallel.
-    Requires bruker_to_py and mpire to be installed.
-
-    Parameters
-    ----------
-    path : str
-        Path to the directory containing the Bruker data.
-    dti_col : str
-        The column in the animal overview sheet to check for the scan id.
-    id_col : str, optional
-        The column in the animal overview sheet to check for the exam id,
-        by default "Study ID"
-    pipeline : list, optional
-        The processing steps to run, 
-        by default ["motion_correction", "denoise", "fit_dti"]
-    kwargs : dict, optional
-        kwargs are passed into the individual processing steps. kwargs
-        should be a dictionary with keys corresponding to the steps in the
-        pipeline and values should be dictionaries of additional arguments
-        to pass into each step, by default {}
-    n_jobs : int, optional
-        Number of CPU cores to use, by default 2
-
-    Returns
-    -------
-    list[TensorFit]
-        List of the tensor fits for each dataset.
-
-    Raises
-    ------
-    ImportError
-        If bruker_to_py is not found.
-    ValueError
-        If degibbs is in the pipeline and num_processes is not 1.
-    
-    Examples
-    --------
-    >>> from dipy_dti_fit import multiprocess_DTI
-    >>> path = str(Path.cwd().parent / 'MRI_data')
-    >>> multiprocess_DTI(
-        path,
-        dti_col = 'dti',
-        id_col = 'MR #',
-        n_jobs = 3
-    )
-    """
-    if WorkerPool is None:
-        raise ImportError("mpire not found.")
-    kwargs = kwargs or {}
-    pipeline = pipeline or ["motion_correction", "denoise", "fit_dti"]
-    if kwargs.get('degibbs', {}).get('num_processes', 1) != 1:
-        raise ValueError("No additional processes allowed for degibbs.")
-    data_object = init(path, msg=False)
-    with WorkerPool(n_jobs) as pool:
-        pool.imap_unordered(
-            _multiprocess_dti_helper,
-            [(data_object, exam_id, dti_col, id_col, pipeline, kwargs)
-             for exam_id in data_object.avail_exam_ids]
-            )
-
-def _multiprocess_dti_helper(data_object, exam_id, dti_col, id_col, pipeline, kwargs):
-    path_handler = DiPyPathHandler(data_object, exam_id)
-    dpdti = DiPyDTI(
-        path_handler.get_data_paths(
-            dti_col=dti_col, id_col=id_col, return_metadata=True
-            )
-        )
-    dpdti.run_pipeline(pipeline=pipeline, kwargs=kwargs)
-
 class DiPyDTI():
     """Class to handle diffusion tensor imaging (DTI) processing with DiPy.
     User should mainly interact with the load_data and run_pipeline methods. 
@@ -119,7 +51,7 @@ class DiPyDTI():
     correction and repetitions are averaged before the other steps. bvals and 
     bvecs are automatically prepared for multiple repetitions by repeating them 
     num_reps times.
-    
+
     Definitions of ID numbers (following brkraw naming convention):
         - Exam ID: The MR number, number of a new exam card in paravision, 
         e.g. 230215.
@@ -128,12 +60,12 @@ class DiPyDTI():
         - Reco ID: The reconstruction number, e.g. 1. The default image is 1, 
         any additional processing, such as returning phase images, will have
         a different reco id. Diffusion images are usually reco id 1.
-    
+
     Example usage:
     --------------
     from dipy_dti_fit import DiPyDTI
     from path_handler import DiPyPathHandler, init
-    
+
     # Load the data (using DiPyPathHandler)
     path = str(Path.cwd() ... / 'MRI_data') # locate your data folder
     data_object = init(path, msg=False)
@@ -141,11 +73,11 @@ class DiPyDTI():
         dti_col=dti_col, id_col=id_col, return_metadata=True
         )
     dti = DiPyDTI(paths_dict)
-    
+
     # Load the data (using load_data method)
     dti = DiPyDTI()
     dti.load_data(data_path, bvals_path, bvecs_path, mask_path, savedir)
-    
+
     # Load the data (using make_paths_dict method)
     paths_dict = DiPyDTI.make_paths_dict(data_path, bvals_path, bvecs_path, 
         mask_path, savedir)
@@ -153,17 +85,17 @@ class DiPyDTI():
 
     # Loading the data allows for additional kwargs to be passed in
     dti = DiPyDTI(paths_dict, exam_id=230215, scan_id=10, check_data=False)
-    
+
     # Set the save directory (if not provided in the paths_dict)
     dti.set_savedir(savedir)
-    
+
     # Check the paths
     print(dti)
-    
+
     # Run the pipeline (all steps are saved by default, the folder that holds
     # the saved data is determined by .savedir attribute of the DiPyDTI object)
     dti.run_pipeline(pipeline=['motion_correction', 'denoise', 'fit_dti'])
-    
+
     # Full example on multiple datasets using the bruker_to_py.py module
     path = str(Path.cwd().parent / 'MRI_data') # running from Scripts folder next to MRI_data
     data_object = init(path, msg=False)
@@ -178,7 +110,7 @@ class DiPyDTI():
             pipeline = ["motion_correction", "degibbs", "denoise", "fit_dti"],
             kwargs = {'degibbs':{'num_processes':3}}
             )
-    
+
     Explanation of the main methods:
     --------------------------------
     Loading data:
@@ -193,7 +125,7 @@ class DiPyDTI():
         can be set manually using the num_reps attribute.
         - If you have the paths, you can use the DiPyDTI.make_paths_dict method 
         to create the dictionary of paths.
-    
+
     Loading data for running individual methods manually:
         - Replace the data_path in the paths_dict with the path to the saved
         data from the previous step and you can run the individual methods.
@@ -207,18 +139,18 @@ class DiPyDTI():
         prepare_b0s=False in the load_data method.
         - exam_id and scan_id can be set manually as kwargs to either the 
         load_data method or the DiPyDTI object.
-    
+
     Saving data:
         - Steps in the pipeline are saved by default, but you can also save
         individual data arrays using the save method. A DiPyDTI folder is 
         created in the savedir directory and each processing step is saved in a 
         subfolder.
-    
+
     Masking (optional):
         - Options to either have the pipeline extract a brain mask using the 
         option 'extract_brain' or to provide a path to a mask file, or if 
         neither is selected, then the dti fit will be done on the whole brain.
-        
+
     Running the pipeline:
         - The run_pipeline method takes in a list of processing steps to run and
         a dictionary of additional arguments to pass into each step. The steps
@@ -227,19 +159,19 @@ class DiPyDTI():
         - The kwargs dictionary should have keys corresponding to the steps in 
         the pipeline and the values should be dictionaries of additional 
         arguments to pass into each step.
-        
+
     Default pipeline changes to DiPy default values (and original defaults):
         - The motion_correction step uses the pipeline of 
         ['center_of_mass', 'translation', 'rigid'] (no 'affine').
         - The median_otsu function used in extract_brain uses the default
         parameters of median_radius=2, numpass=1 (4, 4).
-    
+
     Default choices for algorithm selection:
         - The denoise step uses the method 'mppca'.
         - The fit_dti step uses the model 'WLS'.
         - The estimate_noise function used in RESTORE model uses the estimator 
         'piesno'.
-        
+
     Attributes:
     -----------
     data_path : Path
@@ -300,7 +232,7 @@ class DiPyDTI():
         The tensor model.
     dti_fit : TensorFit
         The final DTI fit.
-    
+
     Methods:
     --------
     run_pipeline(pipeline: list = ["motion_correction", "denoise", "fit_dti"],
@@ -309,71 +241,71 @@ class DiPyDTI():
         Run a pipeline of processing steps. The default pipeline is in
         self.valid_steps (defined in __init__). After motion correction, the 
         data is averaged if there are multiple repetitions.
-        
+
     load_data(data_path: str, bvals_path: str, bvecs_path: str,
                 mask_path: str = "", **kwargs)
         Load the data, bvals, bvecs, and mask (if provided) into the DiPyDTI 
         object. Optionally set the savedir, method, acqp, and visu_pars. If 
         method file is provided, the number of repetitions will be extracted 
         from it.
-        
+
     make_gradient_table(atol: float = 1.0, **kwargs) -> GradientTable
         Create a gradient table from the bvals and bvecs.
-        
+
     set_savedir(savedir: str)
         Set the save directory for the processed data.
-        
+
     get_scan_ids(data_path: Path) -> tuple[int, int]
         Extract the exam and scan IDs from the data path.
-        
+
     correct_motion(nifti: nib.Nifti1Image, pipeline: list = None,
                     affine: np.ndarray = None, save: bool = True
                     ) -> tuple[nib.Nifti1Image, np.ndarray]
         Correct for between-volume motion artifacts in the diffusion data.
-        
+
     average_repetitions(nifti: nib.Nifti1Image, num_reps: int = 1,
                         save: bool = True) -> nib.Nifti1Image
         Average the repetitions in the diffusion data. The number of repetitions
         is extracted from the method file, or can be set manually using the 
         num_reps attribute.
-        
+
     estimate_noise(nifti: nib.Nifti1Image, receiver_coils: int = 1, 
                     method: str = 'piesno', **kwargs
                     ) -> tuple[np.ndarray, np.ndarray]
         Estimate the noise from the diffusion data. noise_mask is only returned 
         for piesno and it's a mask of the background where the noise is 
         calculated from.
-        
+
     degibbs(nifti: nib.Nifti1Image, slice_axis = 2, save: bool = True, **kwargs)
         Remove Gibbs ringing artifacts from the diffusion data. Option to use
         multiple cores by specifying num_processes=. Warning: do not set the 
         inplace= argument to True.
-        
+
     denoise(nifti: nib.Nifti1Image, method: str = 'mppca', save: bool = True,
             **kwargs) -> nib.Nifti1Image
         Denoise the diffusion data. Main params mentioned below, for more 
         options see the docstrings of the denoising functions.
-        
+
     extract_brain(nifti: nib.Nifti1Image, save: bool = True, 
                     b0_threshold: int = 50, **kwargs
                     ) -> tuple[nib.Nifti1Image, nib.Nifti1Image]
         Extract the brain from the diffusion data.
-        
+
     extract_b0vol(nifti: nib.Nifti1Image, b0_threshold: int = 50) -> np.ndarray
         Extract the b0 volume from the diffusion data.
-        
+
     fit_dti(nifti: nib.Nifti1Image, save: bool = True, model: str = 'WLS',
             **kwargs) -> TensorFit
         Fit the diffusion tensor model to the data. Options: 'WLS', 'RESTORE'.
         kwargs are passed into estimate_noise for the RESTORE model.
-    
+
     save(data: np.ndarray|nib.Nifti1Image, newdir: str = '', filename: str = '')
         Save the data to the savedir directory.
-        
+
     @staticmethod
     to_nifti(nifti: nib.Nifti1Image, data: np.ndarray) -> nib.Nifti1Image
         Convert a numpy array to a nibabel Nifti1Image.
-    
+
     @staticmethod
     make_paths_dict(data_path: str, bvals_path: str, bvecs_path: str,
                     mask_path: str, savedir: str) -> dict
@@ -543,8 +475,8 @@ Savedir: {self.savedir}"""
         self.__log_pipeline(pipeline, kwargs)
         current_data = self.diffusion_data
         try:
-            for step in pipeline:
-                self.__print_step(step)
+            for i, step in enumerate(pipeline):
+                self.__print_step(step, i, len(pipeline))
                 start = time.perf_counter()
                 if step == "motion_correction":
                     correct_motion_kwargs = kwargs.get('motion_correction', {})
@@ -1011,15 +943,37 @@ If a step was successful, it will be logged here:"""
         print(f"Logging the pipeline to {self.logfile}")
         print(log_msg)
 
-    def __print_step(self, step: str):
-        """Print the step to the console surrounded by *'s, example:
-        *********
-        *Denoise*
-        *********"""
-        step = step.replace('_', ' ').replace(' dti', ' DTI')
-        print(f"{'*' * (len(step) + 2)}")
-        print(f"*{step.capitalize()}*")
-        print(f"{'*' * (len(step) + 2)}")
+    def __print_step(self, step: str, i: int = None, t: int = None):
+        """Print the step to the console surrounded by a box, example:
+        ┌────────────────────┐
+        |Step 1 of 5: Denoise|
+        └────────────────────┘
+        
+        Parameters
+        ----------
+        step: str
+            The name of the step.
+        i: int, optional
+            The step number.
+        t: int, optional
+            The total number of steps.
+        
+        Raises
+        ------
+        ValueError
+            If total steps are provided, step number should be provided as well.
+        """
+        if t is not None and i is None:
+            raise ValueError("If total steps are provided, step number should "
+                                "be provided as well.")
+        step_num = f"Step {i}" if i is not None else ""
+        total_steps = f" of {t}" if t is not None else ""
+        connector = ": " if i is not None else ""
+        step = step.replace('_', ' ').replace(' dti', ' DTI').capitalize()
+        message = f"{step_num}{total_steps}{connector}{step}"
+        print(f"┌{'─' * (len(message))}┐")
+        print(f"|{message}|")
+        print(f"└{'─' * (len(message))}┘")
 
     def __log_step(self, step: str, error: Exception = None,
                   t: float|str = ""):
@@ -1047,6 +1001,7 @@ If a step was successful, it will be logged here:"""
 
     def __reshape_5d(self, nifti: nib.Nifti1Image) -> nib.Nifti1Image:
         "Reshape the 5D data to 4D."
+        assert (nifti.ndim == 5, "Data should be 5D.")
         print("Reshaping 5D data to 4D...")
         return self.to_nifti(
             nifti,

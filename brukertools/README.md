@@ -68,6 +68,7 @@ Study_PRIME000/
     ├── bruker_to_py.py
     ├── dipy_dti_fit.py
     ├── path_handler.py
+    ├── multiprocess_wrappers.py
     └── main.ipynb
 ```
 
@@ -120,7 +121,7 @@ for exam_id in D_obj.avail_exam_ids:
 * requires `mpire`
 
 ```py
-from dipy_dti_fit import multiprocess_DTI
+from multiprocess_wrappers import multiprocess_DTI
 path = str(Path.cwd().parent / 'MRI_data')
 multiprocess_DTI(path, dti_col = 'dti', id_col = 'MR #', n_jobs = 3)
 ```

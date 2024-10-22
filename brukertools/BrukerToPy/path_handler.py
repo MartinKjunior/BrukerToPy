@@ -1,3 +1,5 @@
+"Module for handling paths for DiPy processing."
+
 from pathlib import Path
 from typing import Any
 
