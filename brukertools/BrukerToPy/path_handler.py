@@ -53,7 +53,9 @@ class DiPyPathHandler:
         if isinstance(data_object, str):
             if not Path(data_object).exists():
                 raise FileNotFoundError(f'{data_object} does not exist.')
-            data_object = btp.init(data_object, msg=msg, animal_overview=animal_overview)
+            data_object = btp.init(
+                data_object, msg=msg, animal_overview=animal_overview
+                )
         self.data_object = data_object
         self.exam_id = int(exam_id)
         self.scan_id = None
@@ -91,11 +93,14 @@ class DiPyPathHandler:
             ].astype(int).values[0]
 
     def get_data_paths(self, which: str = 'dti_fit', **kwargs) -> dict:
-        match which:
-            case "dti_fit":
-                return self.__get_dti_fit(**kwargs)
-            case "dti_analysis":
-                return self.__get_dti_analysis(**kwargs)
+        options = ['dti_fit', 'dti_analysis']
+        if which == options[0]:
+            return self.__get_dti_fit(**kwargs)
+        elif which == options[1]:
+            return self.__get_dti_analysis(**kwargs)
+        else:
+            raise ValueError('Please choose one of the following options: '
+                             f'{options}.')
     
     def __get_dti_fit(self, dti_col: str = None, scan_id: int = None,
                        id_col: str = "Study ID", return_metadata = False
@@ -157,37 +162,34 @@ class DiPyPathHandler:
             print(f'No mask found for {self.exam_id}.')
         return data_paths
     
-    def __get_dti_analysis(self, mag_col: str = None, phase_col: str = None,
-        id_col: str = "Study ID", mag_id: int = None, phase_id: int = None,
-        mag_reco_id: int = 1, phase_reco_id: int = 2
+    def __get_dti_analysis(self, dti_col: str = None, scan_id: int = None,
+        id_col: str = "Study ID", mag_reco_id: int = 1, 
+        phase_reco_id: int = 2
         ) -> dict:
-        if mag_col is None and mag_id is None:
-            raise ValueError('Please provide either mag_col or mag_id.')
-        if phase_col is None and phase_id is None:
-            raise ValueError('Please provide either phase_col or phase_id.')
-        if mag_id is None:
-            mag_id = self.find_scan_id(mag_col, id_col)
-        if phase_id is None:
-            phase_id = self.find_scan_id(phase_col, id_col)
+        if dti_col is None and scan_id is None:
+            raise ValueError('Please provide either dti_col or scan_id.')
+        if scan_id is None:
+            scan_id = self.find_scan_id(dti_col, id_col)
+        print(f'reco_ids are {mag_reco_id=} and {phase_reco_id=}.')
         data_paths = {}
-        print(f'Looking for data for {self.exam_id}_{mag_id} and {self.exam_id}_{phase_id}...')
+        print(f'Looking for data for {self.exam_id}_{scan_id}...')
         mag_data = self.data_object.pull_exam_data(
-            self.exam_id, mag_id, mag_reco_id, only_path=True
+            self.exam_id, scan_id, mag_reco_id, only_path=True
         )
         phase_data = self.data_object.pull_exam_data(
-            self.exam_id, phase_id, phase_reco_id, only_path=True
+            self.exam_id, scan_id, phase_reco_id, only_path=True
         )
         data_paths['magnitude_path'] = mag_data['recos']['path']
         data_paths['phase_path'] = phase_data['recos']['path']
         data_paths['bvals_path'] = self.data_object.pull_processed_data(
-            self.exam_id, 'BV', substring = f'{self.exam_id}_{mag_id}_bval',
+            self.exam_id, 'BV', substring = f'{self.exam_id}_{scan_id}_bval',
             only_path=True
         )[0]
         data_paths['bvecs_path'] = self.data_object.pull_processed_data(
-            self.exam_id, 'BV', substring = f'{self.exam_id}_{mag_id}_bvec',
+            self.exam_id, 'BV', substring = f'{self.exam_id}_{scan_id}_bvec',
             only_path=True
         )[0]
-        data_paths['method'] = mag_data['method']
+        data_paths['methods_path'] = mag_data['method']
         data_paths['savedir'] = self.data_object.get_savedir(self.exam_id)
         try:
             data_paths['mask_path'] = self.data_object.pull_processed_data(

@@ -22,7 +22,7 @@ from pprint import pprint
 from typing import Iterable
 
 def init(path: str, msg: bool = True, 
-         animal_overview: str = "Rat_Overview.xlsx") -> 'DataObject':
+         animal_overview: str = "animal_overview.xlsx") -> 'DataObject':
     data_object = DataObject(path, animal_overview)
     data_object.load_exams(msg = msg)
     return data_object
