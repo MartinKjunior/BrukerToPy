@@ -295,7 +295,7 @@ class DiPyDTI():
         Extract the b0 volume from the diffusion data.
 
     fit_dti(nifti: nib.Nifti1Image, save: bool = True, model: str = 'WLS',
-            **kwargs) -> TensorFit
+            save_tensor: bool = False, **kwargs) -> TensorFit
         Fit the diffusion tensor model to the data. Options: 'WLS', 'RESTORE'.
         kwargs are passed into estimate_noise for the RESTORE model.
 
@@ -721,7 +721,8 @@ Savedir: {self.savedir}"""
         return nifti.get_fdata()[..., b0_idx]
 
     def fit_dti(self, nifti: nib.Nifti1Image, save: bool = True,
-                model: str = 'WLS', **kwargs) -> TensorFit:
+                model: str = 'WLS', save_tensor: bool = False,
+                **kwargs) -> TensorFit:
         """Fit the diffusion tensor model to the data. Options: 'WLS', 
         'RESTORE'. kwargs are passed into estimate_noise for the RESTORE model.
         """
@@ -731,7 +732,8 @@ Savedir: {self.savedir}"""
         self.dti_fit = self.model.fit(masked_data)
         if save:
             self.save(
-                self.dti_fit, newdir='DTIFit', filename='dti_fit', nifti=nifti
+                self.dti_fit, newdir='DTIFit', filename='dti_fit', nifti=nifti,
+                save_tensor=save_tensor
                 )
         return self.dti_fit
 
@@ -749,7 +751,7 @@ Savedir: {self.savedir}"""
 
     def save(self, data: nib.Nifti1Image|np.ndarray|TensorFit,
              newdir: str = "", filename: str = "",
-             nifti: nib.Nifti1Image = None):
+             nifti: nib.Nifti1Image = None, save_tensor: bool = False):
         """Save the data to the savedir directory. If newdir is provided, a new
         subdirectory will be created in the savedir directory. The filename of 
         the saved data will be {exam_id}_{scan_id}_{filename}.
@@ -765,6 +767,9 @@ Savedir: {self.savedir}"""
         nifti : nib.Nifti1Image, optional
             A nifti object for retrieving affine and header info for saving fa 
             and md maps, by default None
+        save_tensor : bool, optional
+            Whether to save the tensor data as a pickled python object, by 
+            default False
 
         Raises
         ------
@@ -790,7 +795,8 @@ Savedir: {self.savedir}"""
                 self.to_nifti(nifti, data.md),
                 new_savedir / f'{prefix}_mean_diffusivity.nii.gz'
                 )
-            np.save(new_savedir / f'{prefix}_{filename}.npy', data)
+            if save_tensor:
+                np.save(new_savedir / f'{prefix}_{filename}.npy', data)
         else:
             raise ValueError(f"Data type {type(data)} not recognized for "
                              "saving.")
@@ -1001,7 +1007,7 @@ If a step was successful, it will be logged here:"""
 
     def __reshape_5d(self, nifti: nib.Nifti1Image) -> nib.Nifti1Image:
         "Reshape the 5D data to 4D."
-        assert (nifti.ndim == 5, "Data should be 5D.")
+        assert nifti.ndim == 5, "Data should be 5D."
         print("Reshaping 5D data to 4D...")
         return self.to_nifti(
             nifti,
